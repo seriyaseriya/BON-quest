@@ -47,7 +47,6 @@ class Player:
         return False
 
     def apply_upgrade(self, choice):
-
         if choice == 1:
             self.max_hp += 3
             self.hp = self.max_hp
@@ -64,8 +63,13 @@ class Player:
     def get_total_attack(self):
         return self.attack + self.equipment.get_attack_bonus()
 
-    def move(self, dx, dy, game_map, enemies):
+    def is_enemy_at_position(self, enemy, x, y):
+        if hasattr(enemy, "occupies_position"):
+            return enemy.occupies_position(x, y)
 
+        return enemy.x == x and enemy.y == y
+
+    def move(self, dx, dy, game_map, enemies):
         if dx == 1:
             self.direction = "right"
 
@@ -88,14 +92,11 @@ class Player:
             return None
 
         for enemy in enemies:
-
             if enemy.hp <= 0:
                 continue
 
-            if next_x == enemy.x and next_y == enemy.y:
-
+            if self.is_enemy_at_position(enemy, next_x, next_y):
                 damage = self.get_total_attack()
-
                 result = enemy.take_damage(damage)
 
                 self.walk_count += 1
@@ -117,7 +118,6 @@ class Player:
         return None
 
     def draw(self, screen):
-
         offset_y = 0
 
         if self.walk_count % 2 == 1:

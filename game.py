@@ -11,7 +11,22 @@ class Game:
     def __init__(self):
         pygame.init()
 
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        # 実際のウィンドウ
+        self.screen = pygame.display.set_mode(
+            (
+                WINDOW_WIDTH,
+                WINDOW_HEIGHT,
+            )
+        )
+
+        # ゲーム描画用（内部解像度）
+        self.game_surface = pygame.Surface(
+            (
+                INTERNAL_WIDTH,
+                INTERNAL_HEIGHT,
+            )
+        )
+
         pygame.display.set_caption("BON QUEST")
 
         load_images()
@@ -41,7 +56,20 @@ class Game:
         self.current_scene.update()
 
     def draw(self):
+        self.game_surface.fill(BLACK)
+
         self.current_scene.draw()
+
+        scaled_surface = pygame.transform.scale(
+            self.game_surface,
+            (
+                WINDOW_WIDTH,
+                WINDOW_HEIGHT,
+            )
+        )
+
+        self.screen.blit(scaled_surface, (0, 0))
+
         pygame.display.flip()
 
     def run(self):

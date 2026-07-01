@@ -1,358 +1,350 @@
 import pygame
-import random
 
 from settings import *
 from inventory import Inventory
-from ui import draw_ui, draw_level_up, draw_inventory, draw_equipment
+
+from ui.hud import draw_hud
+from ui.inventory_ui import draw_inventory
+from ui.equipment_ui import draw_equipment
+from ui.levelup_ui import draw_level_up
+from ui.reward_ui import draw_reward_choices
 
 from entities.player import Player
-from entities.enemy import Enemy
-from entities.item import Item
+from entities.chest import Chest
+
+from systems.floor_system import FloorSystem
+from systems.reward_system import RewardSystem
+from systems.drops import DropSystem
+from systems.combat import CombatSystem
+from systems.interaction_system import InteractionSystem
+from systems.spawn_system import SpawnSystem
+from systems.item_pickup_system import ItemPickupSystem
+
+from managers.enemy_manager import EnemyManager
+from managers.effect_manager import EffectManager
+from managers.ui_manager import UIManager
+from systems.floor_transition_system import FloorTransitionSystem
+from managers.game_state_manager import GameStateManager
 
 from dungeon.game_map import (
     game_map,
     draw_map,
-    generate_map,
+    generate_floor,
     get_random_floor_position,
     get_start_position,
+    get_boss_position,
+    get_boss_treasure_position,
+    close_boss_gate,
+    open_boss_gate,
+    spawn_boss_stairs,
 )
-
-from effects.attack_effect import AttackEffect
-from effects.damage_text import DamageText
 
 
 class PlayScene:
     def __init__(self, game):
         self.game = game
-        self.screen = game.screen
+        self.screen = game.game_surface
 
-        self.title_font = pygame.font.SysFont(None, 72)
-        self.small_font = pygame.font.SysFont(None, 32)
+        self.floor_system = FloorSystem()
+        self.reward_system = RewardSystem()
+        self.drop_system = DropSystem()
+        self.combat_system = CombatSystem()
+        self.interaction_system = InteractionSystem()
+        self.spawn_system = SpawnSystem()
+        self.item_pickup_system = ItemPickupSystem()
+
+        self.enemy_manager = EnemyManager()
+        self.effect_manager = EffectManager()
+        self.ui_manager = UIManager()
+        self.floor_transition_system = FloorTransitionSystem()
+        self.state = GameStateManager()
 
         self.reset()
 
     def reset(self):
-        generate_map()
+        self.floor_system.reset()
+        self.state.reset()
+
+        generate_floor(False)
 
         self.player = Player()
         self.player.x, self.player.y = get_start_position()
 
         self.inventory = Inventory()
-        self.floor = 1
 
-        self.enemies = self.create_enemies()
-        self.items = self.create_items()
-        self.effects = []
-        self.damage_texts = []
+        self.items = []
+        self.chests = []
 
-        self.level_up = False
-        self.show_inventory = False
-        self.show_equipment = False
-        self.game_over = False
+        self.reward_choices = []
+        self.level_reward_choices = []
 
-        self.message = ""
-        self.message_timer = 0
+        self.floor_intro_timer = 90
+        self.floor_intro_text = self.floor_system.get_floor_name()
 
-    def create_enemies(self):
-        enemies = []
-        enemy_count = 2 + self.floor
+        self.setup_floor()
 
-        while len(enemies) < enemy_count:
-            x, y = get_random_floor_position(self.player, min_distance=5)
-
-            overlap = False
-            for enemy in enemies:
-                if enemy.x == x and enemy.y == y:
-                    overlap = True
-
-            if overlap:
-                continue
-
-            enemies.append(Enemy(x, y))
-
-        return enemies
-
-    def create_items(self):
-        items = []
-
-        for _ in range(3):
-            x, y = get_random_floor_position(self.player, min_distance=3)
-
-            overlap = False
-            for item in items:
-                if item.x == x and item.y == y:
-                    overlap = True
-
-            if overlap:
-                continue
-
-            items.append(Item(x, y, "potion"))
-
-        return items
-
-    def next_floor(self):
-        self.floor += 1
-
-        generate_map()
+    def setup_floor(self):
+        generate_floor(
+            self.floor_system.is_boss_floor()
+        )
 
         self.player.x, self.player.y = get_start_position()
 
-        self.enemies = self.create_enemies()
-        self.items = self.create_items()
-        self.effects = []
-        self.damage_texts = []
+        self.items = []
+        self.chests = []
+
+        self.effect_manager.clear()
+        self.enemy_manager.clear()
+
+        if self.floor_system.is_boss_floor():
+            self.enemy_manager.setup_boss_floor(
+                self.spawn_system
+            )
+        else:
+            self.items = self.spawn_system.create_items(
+                self.player,
+                self.floor_system.is_boss_floor()
+            )
+
+            self.enemy_manager.setup_normal_floor(
+                self.spawn_system,
+                self.player,
+                self.floor_system.floor
+            )
+
+        self.floor_intro_timer = 90
+        self.floor_intro_text = self.floor_system.get_floor_name()
+
+    def next_floor(self):
+        self.floor_system.next_floor()
+        self.setup_floor()
 
     def set_message(self, text):
-        self.message = text
-        self.message_timer = 60
+        self.state.set_message(text)
 
-    def create_random_equipment_drop(self, x, y):
-        roll = random.random()
-
-        if roll < 0.5:
-            weapons = [
-                ("小魚ソード", 1),
-                ("サンマブレード", 2),
-                ("マグロソード", 3),
-                ("伝説のネコパンチ", 5),
-            ]
-
-            name, power = random.choice(weapons)
-            return Item(x, y, "weapon", name, power)
-
-        armors = [
-            ("毛糸の首輪", 1),
-            ("革の首輪", 2),
-            ("銀の首輪", 3),
-            ("王家の首輪", 5),
-        ]
-
-        name, power = random.choice(armors)
-        return Item(x, y, "armor", name, power)
-
-    def drop_item(self, enemy):
-        coin_amount = random.randint(1, 5)
-        self.inventory.add_coins(coin_amount)
-
-        roll = random.random()
-
-        if roll < 0.25:
-            self.items.append(Item(enemy.x, enemy.y, "potion"))
-            self.set_message(f"Got {coin_amount} coins! Potion dropped!")
-
-        elif roll < 0.45:
-            equipment = self.create_random_equipment_drop(enemy.x, enemy.y)
-            self.items.append(equipment)
-            self.set_message(f"Got {coin_amount} coins! Equipment dropped!")
-
-        else:
-            self.set_message(f"Got {coin_amount} coins!")
+    def start_level_up(self):
+        self.level_reward_choices = self.reward_system.create_level_choices(3)
+        self.state.open_level_up()
 
     def handle_keydown(self, key):
         if key == pygame.K_r:
             self.reset()
             return
 
-        if self.level_up:
+        if self.state.show_reward_choices:
+            self.handle_reward_choice(key)
+            return
+
+        if self.state.level_up:
             self.handle_level_up(key)
             return
 
-        if self.show_inventory:
+        if self.state.show_inventory:
             self.handle_inventory(key)
             return
 
-        if self.show_equipment:
+        if self.state.show_equipment:
             if key == pygame.K_e:
-                self.show_equipment = False
+                self.state.close_equipment()
             return
 
-        if self.game_over:
+        if self.state.game_over:
             return
 
         if key == pygame.K_i:
-            self.show_inventory = True
+            self.state.open_inventory()
             return
 
         if key == pygame.K_e:
-            self.show_equipment = True
+            if self.try_interact():
+                return
+
+            self.state.open_equipment()
             return
 
-        self.handle_move(key)
+        self.handle_move_or_attack(key)
+
+    def handle_move_or_attack(self, key):
+        self.combat_system.handle_player_action(
+            key,
+            self.player,
+            game_map,
+            self.enemy_manager,
+            self.effect_manager,
+            self.handle_enemy_defeated,
+            self.handle_boss_defeated,
+        )
 
     def handle_level_up(self, key):
-        if key == pygame.K_1:
-            self.player.apply_upgrade(1)
-            self.level_up = False
-            self.set_message("Max HP Up!")
+        index = self.interaction_system.get_choice_index(key)
 
-        elif key == pygame.K_2:
-            self.player.apply_upgrade(2)
-            self.level_up = False
-            self.set_message("Attack Up!")
+        if index is None:
+            return
 
-        elif key == pygame.K_3:
-            self.player.apply_upgrade(3)
-            self.level_up = False
-            self.set_message("Healed!")
+        if index >= len(self.level_reward_choices):
+            return
+
+        reward = self.level_reward_choices[index]
+
+        message = self.reward_system.apply_reward(
+            reward,
+            self.player,
+            self.inventory,
+        )
+
+        self.set_message(message)
+
+        self.level_reward_choices = []
+        self.state.close_level_up()
 
     def handle_inventory(self, key):
         if key == pygame.K_i:
-            self.show_inventory = False
+            self.state.close_inventory()
 
         elif key == pygame.K_1:
             self.set_message(self.inventory.use_potion(self.player))
 
-    def handle_move(self, key):
-        attack_result = None
+    def try_interact(self):
+        interacted, choices = self.interaction_system.try_interact_with_chest(
+            self.player,
+            self.chests,
+            self.reward_system,
+        )
 
-        if key == pygame.K_w:
-            attack_result = self.player.move(0, -1, game_map, self.enemies)
+        if interacted:
+            self.reward_choices = choices
+            self.state.open_reward()
+            return True
 
-        elif key == pygame.K_s:
-            attack_result = self.player.move(0, 1, game_map, self.enemies)
+        return False
+    
+    def handle_reward_choice(self, key):
+        selected, message, choices = self.interaction_system.choose_reward(
+            key,
+            self.reward_choices,
+            self.reward_system,
+            self.player,
+            self.inventory,
+        )
 
-        elif key == pygame.K_a:
-            attack_result = self.player.move(-1, 0, game_map, self.enemies)
-
-        elif key == pygame.K_d:
-            attack_result = self.player.move(1, 0, game_map, self.enemies)
-
-        if attack_result is None:
+        if not selected:
             return
 
-        result, enemy, damage = attack_result
-
-        if result in ["enemy_hit", "enemy_defeated"]:
-            self.effects.append(AttackEffect(enemy.x, enemy.y))
-            self.damage_texts.append(DamageText(enemy.x, enemy.y, damage))
-
-        if result == "enemy_defeated":
-            self.handle_enemy_defeated(enemy)
+        self.set_message(message)
+        self.reward_choices = choices
+        self.state.close_reward()
 
     def handle_enemy_defeated(self, defeated_enemy):
-        self.drop_item(defeated_enemy)
+        message = self.drop_system.drop_from_enemy(
+            defeated_enemy,
+            self.inventory,
+            self.items,
+        )
+
+        self.set_message(message)
 
         leveled = self.player.gain_exp(1)
 
         if leveled:
-            self.level_up = True
+            self.start_level_up()
+
+    def handle_boss_defeated(self):
+        self.set_message("KING RAT defeated!")
+
+        leveled = self.player.gain_exp(5)
+
+        if leveled:
+            self.start_level_up()
+
+        open_boss_gate()
+        spawn_boss_stairs()
+
+        chest_x, chest_y = get_boss_treasure_position()
+        self.chests.append(Chest(chest_x, chest_y))
 
     def update(self):
-        if self.game_over:
+        if self.state.game_over:
             return
 
-        if self.level_up or self.show_inventory or self.show_equipment:
+        if self.state.is_ui_blocking_gameplay():
             return
 
-        for enemy in self.enemies:
-            enemy.update(self.player, game_map)
+        if self.floor_intro_timer > 0:
+            self.floor_intro_timer -= 1
 
-        for effect in self.effects[:]:
-            effect.update()
+        self.enemy_manager.update(
+            self.player,
+            game_map,
+        )
 
-            if effect.is_finished():
-                self.effects.remove(effect)
+        self.effect_manager.update()
 
-        for damage_text in self.damage_texts[:]:
-            damage_text.update()
+        message = self.item_pickup_system.pickup_items(
+            self.player,
+            self.inventory,
+            self.items,
+        )
 
-            if damage_text.is_finished():
-                self.damage_texts.remove(damage_text)
+        if message is not None:
+            self.set_message(message)
 
-        self.check_item_pickup()
-
-        if self.message_timer > 0:
-            self.message_timer -= 1
-
-            if self.message_timer == 0:
-                self.message = ""
+        self.state.update_message()
 
         if self.player.hp <= 0:
-            self.game_over = True
+            self.state.set_game_over()
 
-        if game_map[self.player.y][self.player.x] == ">":
-            self.next_floor()
+        self.floor_transition_system.check_stairs(
+            self.player,
+            game_map,
+            self.floor_system,
+            self.enemy_manager,
+            self.next_floor,
+            self.set_message,
+        )
 
-    def check_item_pickup(self):
-        for item in self.items[:]:
-            if self.player.x == item.x and self.player.y == item.y:
+        self.floor_transition_system.update_boss_gate(
+            self.player,
+            self.enemy_manager,
+        )
 
-                if item.kind == "potion":
-                    self.inventory.add("potion", 1)
-                    self.set_message("Got Potion!")
-
-                elif item.kind == "weapon":
-                    self.player.equipment.equip_weapon(item.name, item.power)
-                    self.set_message(
-                        f"Equipped {item.name}! ATK +{item.power}"
-                    )
-
-                elif item.kind == "armor":
-                    self.player.equipment.equip_armor(item.name, item.power)
-                    self.set_message(
-                        f"Equipped {item.name}! DEF +{item.power}"
-                    )
-
-                self.items.remove(item)
-
-    def draw(self):
-        self.screen.fill(BLACK)
-
+    def draw_world(self):
         draw_map(self.screen)
 
         for item in self.items:
             item.draw(self.screen)
 
-        for enemy in self.enemies:
-            enemy.draw(self.screen)
+        for chest in self.chests:
+            chest.draw(self.screen)
+
+        self.enemy_manager.draw(self.screen)
 
         self.player.draw(self.screen)
 
-        for effect in self.effects:
-            effect.draw(self.screen)
+        self.effect_manager.draw(self.screen)
 
-        for damage_text in self.damage_texts:
-            damage_text.draw(self.screen)
-
-        draw_ui(self.screen, self.player)
-
-        floor_text = self.small_font.render(f"Floor {self.floor}", True, WHITE)
-        self.screen.blit(floor_text, (10, 40))
-
-        enemy_count = len([enemy for enemy in self.enemies if enemy.hp > 0])
-        enemy_text = self.small_font.render(f"Enemies {enemy_count}", True, WHITE)
-        self.screen.blit(enemy_text, (10, 70))
-
-        potion_text = self.small_font.render(
-            f"Potion x {self.inventory.items.get('potion', 0)}",
-            True,
-            WHITE
+    def draw_ui(self):
+        self.ui_manager.draw(
+            self.screen,
+            self.player,
+            self.floor_system.floor,
+            self.enemy_manager.get_enemy_count(),
+            self.inventory,
+            self.state.message,
+            self.enemy_manager.boss,
+            self.chests,
+            self.floor_intro_timer,
+            self.floor_intro_text,
+            self.state.game_over,
+            self.state.level_up,
+            self.level_reward_choices,
+            self.state.show_inventory,
+            self.state.show_equipment,
+            self.state.show_reward_choices,
+            self.reward_choices,
         )
-        self.screen.blit(potion_text, (10, 120))
 
-        coin_text = self.small_font.render(
-            f"Coins {self.inventory.coins}G",
-            True,
-            (255, 220, 80)
-        )
-        self.screen.blit(coin_text, (10, 150))
+    def draw(self):
+        self.screen.fill(BLACK)
 
-        if self.message_timer > 0:
-            text = self.small_font.render(self.message, True, (255, 255, 0))
-            self.screen.blit(text, (250, 10))
-
-        if self.game_over:
-            text = self.title_font.render("GAME OVER", True, (255, 0, 0))
-            self.screen.blit(text, (140, 170))
-
-            text = self.small_font.render("Press R to Restart", True, WHITE)
-            self.screen.blit(text, (210, 260))
-
-        if self.level_up:
-            draw_level_up(self.screen, self.player)
-
-        if self.show_inventory:
-            draw_inventory(self.screen, self.inventory, self.player)
-
-        if self.show_equipment:
-            draw_equipment(self.screen, self.player)
+        self.draw_world()
+        self.draw_ui()
