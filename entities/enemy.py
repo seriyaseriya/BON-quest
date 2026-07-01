@@ -21,8 +21,9 @@ class Enemy:
         self.move_timer = 0
         self.move_interval = 30
 
-        # 攻撃を受けたときに赤く光る時間
         self.hit_flash_timer = 0
+
+        self.freeze_timer = 0
 
     def take_damage(self, damage):
         self.hp -= damage
@@ -39,6 +40,10 @@ class Enemy:
 
         if self.hit_flash_timer > 0:
             self.hit_flash_timer -= 1
+
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
+            return
 
         self.move_timer += 1
 
@@ -68,7 +73,13 @@ class Enemy:
             if damage < 1:
                 damage = 1
 
-            player.hp -= damage
+            if player.shield_hp > 0:
+                blocked = min(player.shield_hp, damage)
+                player.shield_hp -= blocked
+                damage -= blocked
+
+            if damage > 0:
+                player.hp -= damage
             print(f"ミルクが攻撃された！ -{damage} HP:{player.hp}")
             return
 
@@ -91,8 +102,12 @@ class Enemy:
 
         screen.blit(self.image, (draw_x, draw_y))
 
-        # ダメージを受けた直後、一瞬赤く光らせる
         if self.hit_flash_timer > 0:
             flash = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
             flash.fill((255, 0, 0, 120))
             screen.blit(flash, (draw_x, draw_y))
+
+        if self.freeze_timer > 0:
+            freeze = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+            freeze.fill((120, 180, 255, 100))
+            screen.blit(freeze, (draw_x, draw_y))

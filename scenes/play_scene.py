@@ -3,11 +3,7 @@ import pygame
 from settings import *
 from inventory import Inventory
 
-from ui.hud import draw_hud
-from ui.inventory_ui import draw_inventory
-from ui.equipment_ui import draw_equipment
-from ui.levelup_ui import draw_level_up
-from ui.reward_ui import draw_reward_choices
+from ui.ability_ui import draw_ability_ui
 
 from entities.player import Player
 from entities.chest import Chest
@@ -19,22 +15,21 @@ from systems.combat import CombatSystem
 from systems.interaction_system import InteractionSystem
 from systems.spawn_system import SpawnSystem
 from systems.item_pickup_system import ItemPickupSystem
+from systems.floor_transition_system import FloorTransitionSystem
 
 from managers.enemy_manager import EnemyManager
 from managers.effect_manager import EffectManager
 from managers.ui_manager import UIManager
-from systems.floor_transition_system import FloorTransitionSystem
 from managers.game_state_manager import GameStateManager
+from managers.ability_manager import AbilityManager
+from managers.projectile_manager import ProjectileManager
 
 from dungeon.game_map import (
     game_map,
     draw_map,
     generate_floor,
-    get_random_floor_position,
     get_start_position,
-    get_boss_position,
     get_boss_treasure_position,
-    close_boss_gate,
     open_boss_gate,
     spawn_boss_stairs,
 )
@@ -52,12 +47,15 @@ class PlayScene:
         self.interaction_system = InteractionSystem()
         self.spawn_system = SpawnSystem()
         self.item_pickup_system = ItemPickupSystem()
+        self.floor_transition_system = FloorTransitionSystem()
 
         self.enemy_manager = EnemyManager()
         self.effect_manager = EffectManager()
         self.ui_manager = UIManager()
-        self.floor_transition_system = FloorTransitionSystem()
         self.state = GameStateManager()
+
+        self.ability_manager = AbilityManager()
+        self.projectile_manager = ProjectileManager()
 
         self.reset()
 
@@ -65,12 +63,22 @@ class PlayScene:
         self.floor_system.reset()
         self.state.reset()
 
-        generate_floor(False)
-
         self.player = Player()
         self.player.x, self.player.y = get_start_position()
 
         self.inventory = Inventory()
+
+        self.ability_manager = AbilityManager()
+        self.projectile_manager = ProjectileManager()
+
+        self.ability_manager.add_or_level_up("soccer_ball")
+        self.ability_manager.add_or_level_up("mouse_bomb")
+        self.ability_manager.add_or_level_up("lullaby")
+        self.ability_manager.add_or_level_up("intimidate")
+        self.ability_manager.add_or_level_up("scratch")
+        self.ability_manager.add_or_level_up("barrier")
+        self.ability_manager.add_or_level_up("purr")
+        self.ability_manager.add_or_level_up("cat_beam")
 
         self.items = []
         self.chests = []
@@ -95,6 +103,7 @@ class PlayScene:
 
         self.effect_manager.clear()
         self.enemy_manager.clear()
+        self.projectile_manager.clear()
 
         if self.floor_system.is_boss_floor():
             self.enemy_manager.setup_boss_floor(
@@ -123,7 +132,10 @@ class PlayScene:
         self.state.set_message(text)
 
     def start_level_up(self):
-        self.level_reward_choices = self.reward_system.create_level_choices(3)
+        self.level_reward_choices = self.reward_system.create_mixed_level_choices(
+            self.ability_manager,
+            3,
+        )
         self.state.open_level_up()
 
     def handle_keydown(self, key):
@@ -190,6 +202,7 @@ class PlayScene:
             reward,
             self.player,
             self.inventory,
+            self.ability_manager,
         )
 
         self.set_message(message)
@@ -212,26 +225,36 @@ class PlayScene:
         )
 
         if interacted:
-            self.reward_choices = choices
+            self.reward_choices = self.reward_system.create_mixed_chest_choices(
+                self.ability_manager,
+                3,
+            )
             self.state.open_reward()
             return True
 
         return False
-    
-    def handle_reward_choice(self, key):
-        selected, message, choices = self.interaction_system.choose_reward(
-            key,
-            self.reward_choices,
-            self.reward_system,
-            self.player,
-            self.inventory,
-        )
 
-        if not selected:
+    def handle_reward_choice(self, key):
+        index = self.interaction_system.get_choice_index(key)
+
+        if index is None:
             return
 
+        if index >= len(self.reward_choices):
+            return
+
+        reward = self.reward_choices[index]
+
+        message = self.reward_system.apply_reward(
+            reward,
+            self.player,
+            self.inventory,
+            self.ability_manager,
+        )
+
         self.set_message(message)
-        self.reward_choices = choices
+
+        self.reward_choices = []
         self.state.close_reward()
 
     def handle_enemy_defeated(self, defeated_enemy):
@@ -277,6 +300,19 @@ class PlayScene:
             game_map,
         )
 
+        self.ability_manager.update(
+            self.player,
+            self.projectile_manager,
+            self.enemy_manager.enemies,
+            self.handle_enemy_defeated,
+        )
+
+        self.projectile_manager.update(
+            game_map,
+            self.enemy_manager.enemies,
+            self.handle_enemy_defeated,
+        )
+
         self.effect_manager.update()
 
         message = self.item_pickup_system.pickup_items(
@@ -318,6 +354,8 @@ class PlayScene:
 
         self.enemy_manager.draw(self.screen)
 
+        self.projectile_manager.draw(self.screen)
+
         self.player.draw(self.screen)
 
         self.effect_manager.draw(self.screen)
@@ -341,6 +379,11 @@ class PlayScene:
             self.state.show_equipment,
             self.state.show_reward_choices,
             self.reward_choices,
+        )
+
+        draw_ability_ui(
+            self.screen,
+            self.ability_manager,
         )
 
     def draw(self):

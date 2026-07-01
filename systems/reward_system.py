@@ -1,5 +1,7 @@
 import random
 
+from data.abilities import ABILITY_DATA
+
 
 class Reward:
     def __init__(
@@ -8,6 +10,7 @@ class Reward:
         description,
         kind,
         value=0,
+        ability_id=None,
         source="both",
         icon="?",
         rarity="common",
@@ -16,6 +19,7 @@ class Reward:
         self.description = description
         self.kind = kind
         self.value = value
+        self.ability_id = ability_id
         self.source = source
         self.icon = icon
         self.rarity = rarity
@@ -29,72 +33,72 @@ class RewardSystem:
                 "Coins +30",
                 "coins",
                 30,
-                "chest",
-                "G",
-                "common",
+                source="chest",
+                icon="G",
+                rarity="common",
             ),
             Reward(
                 "Potion Set",
                 "Potion +2",
                 "potion",
                 2,
-                "chest",
-                "P",
-                "common",
+                source="chest",
+                icon="P",
+                rarity="common",
             ),
             Reward(
                 "Vital Fish",
                 "Max HP +3",
                 "max_hp",
                 3,
-                "both",
-                "HP",
-                "common",
+                source="both",
+                icon="HP",
+                rarity="common",
             ),
             Reward(
                 "Power Claw",
                 "Attack +1",
                 "attack",
                 1,
-                "both",
-                "ATK",
-                "common",
+                source="both",
+                icon="ATK",
+                rarity="common",
             ),
             Reward(
                 "Warm Milk",
                 "Heal +5",
                 "heal",
                 5,
-                "level",
-                "HEAL",
-                "common",
+                source="level",
+                icon="HEAL",
+                rarity="common",
             ),
             Reward(
                 "Healing Milk",
                 "Full Heal",
                 "full_heal",
                 0,
-                "both",
-                "FULL",
-                "rare",
+                source="both",
+                icon="FULL",
+                rarity="rare",
             ),
             Reward(
                 "Rare Weapon",
                 "Royal Sword",
                 "rare_weapon",
                 1,
-                "chest",
-                "WPN",
-                "epic",
+                source="chest",
+                icon="WPN",
+                rarity="epic",
             ),
             Reward(
                 "Rare Collar",
                 "Royal Armor",
                 "rare_armor",
                 1,
-                "chest",
-                "ARM",
-                "epic",
+                source="chest",
+                icon="ARM",
+                rarity="epic",
             ),
         ]
 
@@ -118,7 +122,70 @@ class RewardSystem:
     def create_level_choices(self, count=3):
         return self.create_choices(count, "level")
 
-    def apply_reward(self, reward, player, inventory):
+    def create_ability_rewards(self, ability_manager, count=3):
+        rewards = []
+
+        ability_ids = ability_manager.get_random_ability_choices(count)
+
+        for ability_id in ability_ids:
+            data = ABILITY_DATA[ability_id]
+            current_level = ability_manager.get_level(ability_id)
+            next_level = current_level + 1
+
+            rewards.append(
+                Reward(
+                    data["name"],
+                    f"{data['description']} / Lv{next_level}",
+                    "ability",
+                    ability_id=ability_id,
+                    source="both",
+                    icon="★",
+                    rarity=data["rarity"],
+                )
+            )
+
+        return rewards
+
+    def create_mixed_level_choices(self, ability_manager, count=3):
+        normal_count = 2
+        ability_count = count - normal_count
+
+        normal_rewards = self.create_level_choices(normal_count)
+        ability_rewards = self.create_ability_rewards(
+            ability_manager,
+            ability_count,
+        )
+
+        choices = normal_rewards + ability_rewards
+        random.shuffle(choices)
+
+        return choices[:count]
+
+    def create_mixed_chest_choices(self, ability_manager, count=3):
+        normal_count = 2
+        ability_count = count - normal_count
+
+        normal_rewards = self.create_chest_choices(normal_count)
+        ability_rewards = self.create_ability_rewards(
+            ability_manager,
+            ability_count,
+        )
+
+        choices = normal_rewards + ability_rewards
+        random.shuffle(choices)
+
+        return choices[:count]
+
+    def apply_reward(self, reward, player, inventory, ability_manager=None):
+        if reward.kind == "ability":
+            if ability_manager is None:
+                return "AbilityManager is missing!"
+
+            ability_manager.add_or_level_up(reward.ability_id)
+            level = ability_manager.get_level(reward.ability_id)
+
+            return f"{reward.name} Lv{level}!"
+
         if reward.kind == "coins":
             inventory.add_coins(reward.value)
             return f"Got {reward.value} coins!"

@@ -11,6 +11,12 @@ class Player:
         self.max_hp = 10
         self.hp = 10
 
+        self.shield_hp = 0
+        self.max_shield_hp = 0
+
+        self.purr_still_timer = 0
+        self.last_purr_walk_count = 0
+
         self.attack = 1
 
         self.level = 1
@@ -33,6 +39,10 @@ class Player:
             )
 
         self.direction = "front"
+
+        self.direction_x = 0
+        self.direction_y = 1
+
         self.walk_count = 0
 
     def gain_exp(self, amount):
@@ -69,18 +79,29 @@ class Player:
 
         return enemy.x == x and enemy.y == y
 
-    def move(self, dx, dy, game_map, enemies):
+    def update_direction(self, dx, dy):
         if dx == 1:
             self.direction = "right"
+            self.direction_x = 1
+            self.direction_y = 0
 
         elif dx == -1:
             self.direction = "left"
+            self.direction_x = -1
+            self.direction_y = 0
 
         elif dy == 1:
             self.direction = "front"
+            self.direction_x = 0
+            self.direction_y = 1
 
         elif dy == -1:
             self.direction = "back"
+            self.direction_x = 0
+            self.direction_y = -1
+
+    def move(self, dx, dy, game_map, enemies):
+        self.update_direction(dx, dy)
 
         next_x = self.x + dx
         next_y = self.y + dy
