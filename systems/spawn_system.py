@@ -1,6 +1,12 @@
 from entities.enemy import Enemy
 from entities.item import Item
 from entities.king_rat import KingRat
+from entities.big_snake import BigSnake
+from entities.ice_crab import IceCrab
+from entities.ghost_chan import GhostChan
+from entities.white_tanto import WhiteTanto
+from entities.denishi import Denishi
+from entities.takashi import Takashi
 
 from dungeon.game_map import (
     get_random_floor_position,
@@ -49,6 +55,25 @@ class SpawnSystem:
 
         return items
 
-    def create_boss(self):
+    def create_boss(self, floor):
         boss_x, boss_y = get_boss_position()
+
+        if floor == 10:
+            return BigSnake(boss_x, boss_y)
+
+        if floor == 15:
+            return IceCrab(boss_x, boss_y)
+
+        if floor == 20:
+            return GhostChan(boss_x, boss_y)
+
+        if floor == 25:
+            return WhiteTanto(boss_x, boss_y)
+
+        if floor == 29:
+            return Denishi(boss_x, boss_y)
+
+        if floor == 30:
+            return Takashi(boss_x, boss_y)
+
         return KingRat(boss_x, boss_y)

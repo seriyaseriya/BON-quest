@@ -1,3 +1,6 @@
+from dungeon.theme_manager import ThemeManager
+
+
 class FloorSystem:
     def __init__(self):
         self.floor = 1
@@ -9,10 +12,23 @@ class FloorSystem:
         self.floor += 1
 
     def is_boss_floor(self):
-        return self.floor % 5 == 0
+        return self.floor in [
+            5,
+            10,
+            15,
+            20,
+            25,
+            29,
+            30,
+        ]
+
+    def get_theme(self):
+        return ThemeManager.get_theme(self.floor)
 
     def get_floor_name(self):
-        if self.is_boss_floor():
-            return "BOSS FLOOR"
+        theme = self.get_theme()
 
-        return f"Floor {self.floor}"
+        if self.is_boss_floor():
+            return f"{theme.name} BOSS FLOOR"
+
+        return f"{theme.name} Floor {self.floor}"

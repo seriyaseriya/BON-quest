@@ -4,6 +4,7 @@ from settings import *
 
 game_map = []
 images = {}
+loaded_theme_name = None
 rooms = []
 
 boss_position = (10, 6)
@@ -12,21 +13,21 @@ boss_stairs_position = (18, 13)
 boss_treasure_position = (10, 6)
 
 
-def load_images():
+def load_images(theme):
     global images
+    global loaded_theme_name
 
-    filenames = {
-        ".": "floor.png",
-        "#": "wall.png",
-        "g": "grass.png",
-        "~": "water.png",
-        ">": "stairs_down.png",
-    }
+    if loaded_theme_name == theme.name:
+        return
 
-    for key, filename in filenames.items():
-        image = pygame.image.load(f"assets/{filename}").convert_alpha()
+    images.clear()
+
+    for key, filename in theme.tile_images.items():
+        image = pygame.image.load(filename).convert_alpha()
         image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
         images[key] = image
+
+    loaded_theme_name = theme.name
 
 
 def set_tile(x, y, tile):
@@ -40,11 +41,11 @@ def set_tile(x, y, tile):
     game_map[y] = row[:x] + tile + row[x + 1:]
 
 
-def generate_floor(is_boss=False):
+def generate_floor(is_boss=False, theme=None):
     if is_boss:
         generate_boss_room()
     else:
-        generate_map()
+        generate_map(theme)
 
 
 def generate_boss_room():
@@ -60,39 +61,37 @@ def generate_boss_room():
     for y in range(MAP_HEIGHT):
         game_map.append("#" * MAP_WIDTH)
 
+    # Large boss room
+    create_room(3, 1, 14, 10)
+
     # Start room
-    create_room(2, 11, 5, 3)
+    create_room(2, 12, 5, 2)
 
-    # Long corridor
+    # Connect start room to entrance
     create_h_tunnel(6, 10, 12)
-    create_v_tunnel(8, 12, 10)
 
-    # Boss entrance corridor
-    create_h_tunnel(10, 12, 8)
+    # Entrance corridor
+    create_v_tunnel(10, 12, 9)
+    create_v_tunnel(10, 12, 10)
 
-    # Bigger boss room
-    create_room(11, 2, 8, 10)
-
-    # Gate positions
+    # Boss gate positions
     boss_gate_positions = [
-        (10, 8),
-        (11, 8),
+        (9, 11),
+        (10, 11),
     ]
 
     for x, y in boss_gate_positions:
         set_tile(x, y, ".")
 
-    # Boss is placed deeper inside the room
-    boss_position = (16, 5)
+    boss_position = (9, 3)
 
-    # Treasure and stairs appear after boss defeat
-    boss_treasure_position = (15, 8)
-    boss_stairs_position = (16, 10)
+    boss_treasure_position = (8, 8)
+    boss_stairs_position = (11, 8)
 
     set_tile(boss_stairs_position[0], boss_stairs_position[1], ".")
 
-    rooms.append((2, 11, 5, 3))
-    rooms.append((11, 2, 8, 10))
+    rooms.append((2, 12, 5, 2))
+    rooms.append((3, 1, 14, 10))
 
 
 def close_boss_gate():
@@ -151,7 +150,7 @@ def rooms_overlap(room1, room2):
     )
 
 
-def generate_map():
+def generate_map(theme=None):
     game_map.clear()
     rooms.clear()
 
@@ -200,13 +199,21 @@ def generate_map():
         create_room(3, 5, 6, 5)
         rooms.append((3, 5, 6, 5))
 
-    add_random_nature_tiles()
+    add_random_nature_tiles(theme)
 
     stair_x, stair_y = room_center(rooms[-1])
     set_tile(stair_x, stair_y, ">")
 
 
-def add_random_nature_tiles():
+def add_random_nature_tiles(theme=None):
+    if theme is None:
+        nature_tiles = ["g", "g", "~"]
+    else:
+        nature_tiles = theme.nature_tiles
+
+    if len(nature_tiles) == 0:
+        return
+
     for _ in range(12):
         room = random.choice(rooms)
         room_x, room_y, room_w, room_h = room
@@ -218,7 +225,7 @@ def add_random_nature_tiles():
         y = random.randint(room_y + 1, room_y + room_h - 2)
 
         if game_map[y][x] == ".":
-            set_tile(x, y, random.choice(["g", "g", "~"]))
+            set_tile(x, y, random.choice(nature_tiles))
 
 
 def get_start_position():
@@ -229,11 +236,13 @@ def get_start_position():
 
 
 def get_random_floor_position(player=None, min_distance=0):
+    walkable_tiles = [".", "g", "~"]
+
     while True:
         x = random.randint(1, MAP_WIDTH - 2)
         y = random.randint(1, MAP_HEIGHT - 2)
 
-        if game_map[y][x] not in [".", "g"]:
+        if game_map[y][x] not in walkable_tiles:
             continue
 
         if player is not None:
@@ -245,7 +254,11 @@ def get_random_floor_position(player=None, min_distance=0):
         return x, y
 
 
-def draw_map(screen):
+def draw_map(screen, theme=None):
+    if theme is not None:
+        screen.fill(theme.background_color)
+        load_images(theme)
+
     for y in range(MAP_HEIGHT):
         for x in range(MAP_WIDTH):
             tile = game_map[y][x]

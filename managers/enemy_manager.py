@@ -11,9 +11,9 @@ class EnemyManager:
         self.boss = None
         self.enemies = spawn_system.create_enemies(player, floor)
 
-    def setup_boss_floor(self, spawn_system):
+    def setup_boss_floor(self, spawn_system, floor):
         self.enemies = []
-        self.boss = spawn_system.create_boss()
+        self.boss = spawn_system.create_boss(floor)
 
     def get_collision_targets(self):
         targets = self.enemies[:]

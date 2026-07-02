@@ -64,7 +64,6 @@ class PlayScene:
         self.state.reset()
 
         self.player = Player()
-        self.player.x, self.player.y = get_start_position()
 
         self.inventory = Inventory()
 
@@ -92,8 +91,11 @@ class PlayScene:
         self.setup_floor()
 
     def setup_floor(self):
+        theme = self.floor_system.get_theme()
+
         generate_floor(
-            self.floor_system.is_boss_floor()
+            self.floor_system.is_boss_floor(),
+            theme,
         )
 
         self.player.x, self.player.y = get_start_position()
@@ -107,7 +109,8 @@ class PlayScene:
 
         if self.floor_system.is_boss_floor():
             self.enemy_manager.setup_boss_floor(
-                self.spawn_system
+                self.spawn_system,
+                self.floor_system.floor,
             )
         else:
             self.items = self.spawn_system.create_items(
@@ -141,6 +144,26 @@ class PlayScene:
     def handle_keydown(self, key):
         if key == pygame.K_r:
             self.reset()
+            return
+        
+        if key == pygame.K_7:
+            self.floor_system.floor = 29
+            self.next_floor()
+            return
+
+        if key == pygame.K_8:
+            self.floor_system.floor = 9
+            self.next_floor()
+            return
+
+        if key == pygame.K_9:
+            self.floor_system.floor = 26
+            self.next_floor()
+            return
+
+        if key == pygame.K_0:
+            self.floor_system.floor = 1
+            self.setup_floor()
             return
 
         if self.state.show_reward_choices:
@@ -257,6 +280,12 @@ class PlayScene:
         self.reward_choices = []
         self.state.close_reward()
 
+    def handle_target_defeated(self, defeated_target):
+        if defeated_target == self.enemy_manager.boss:
+            self.handle_boss_defeated()
+        else:
+            self.handle_enemy_defeated(defeated_target)
+
     def handle_enemy_defeated(self, defeated_enemy):
         message = self.drop_system.drop_from_enemy(
             defeated_enemy,
@@ -303,14 +332,14 @@ class PlayScene:
         self.ability_manager.update(
             self.player,
             self.projectile_manager,
-            self.enemy_manager.enemies,
-            self.handle_enemy_defeated,
+            self.enemy_manager.get_collision_targets(),
+            self.handle_target_defeated,
         )
 
         self.projectile_manager.update(
             game_map,
-            self.enemy_manager.enemies,
-            self.handle_enemy_defeated,
+            self.enemy_manager.get_collision_targets(),
+            self.handle_target_defeated,
         )
 
         self.effect_manager.update()
@@ -344,7 +373,10 @@ class PlayScene:
         )
 
     def draw_world(self):
-        draw_map(self.screen)
+        draw_map(
+            self.screen,
+            self.floor_system.get_theme(),
+        )
 
         for item in self.items:
             item.draw(self.screen)
