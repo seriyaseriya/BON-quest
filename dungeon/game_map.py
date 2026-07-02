@@ -1,3 +1,4 @@
+import os
 import pygame
 import random
 from settings import *
@@ -12,22 +13,75 @@ boss_gate_positions = []
 boss_stairs_position = (18, 13)
 boss_treasure_position = (10, 6)
 
+WALKABLE_TILES = [".", "g", "~", ">"]
+
 
 def load_images(theme):
     global images
     global loaded_theme_name
 
-    if loaded_theme_name == theme.name:
+    theme_name = theme.name if theme is not None else "cave"
+
+    if loaded_theme_name == theme_name:
         return
 
     images.clear()
 
-    for key, filename in theme.tile_images.items():
-        image = pygame.image.load(filename).convert_alpha()
+    if theme is not None:
+        for key, filename in theme.tile_images.items():
+            image = pygame.image.load(filename).convert_alpha()
+            image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
+            images[key] = image
+
+    load_cave_autotile_images(theme_name)
+
+    loaded_theme_name = theme_name
+
+
+def load_cave_autotile_images(theme_name):
+    folder = "assets/tiles/cave"
+
+    if not os.path.exists(folder):
+        print("[AutoTile] folder not found:", folder)
+        return
+
+    tile_files = {
+        "floor": "floor.png",
+        "floor_2": "floor_2.png",
+        "floor_crack": "floor_crack.png",
+        "floor_moss": "floor_moss.png",
+
+        "wall": "wall.png",
+        "wall_top": "wall_top.png",
+        "wall_bottom": "wall_bottom.png",
+        "wall_left": "wall_left.png",
+        "wall_right": "wall_right.png",
+
+        "wall_tl": "wall_tl.png",
+        "wall_tr": "wall_tr.png",
+        "wall_bl": "wall_bl.png",
+        "wall_br": "wall_br.png",
+
+        "wall_center": "wall_center.png",
+        "wall_fill1": "wall_fill1.png",
+        "wall_fill2": "wall_fill2.png",
+    }
+
+    loaded = []
+
+    for key, filename in tile_files.items():
+        path = os.path.join(folder, filename)
+
+        if not os.path.exists(path):
+            print("[AutoTile] missing:", path)
+            continue
+
+        image = pygame.image.load(path).convert_alpha()
         image = pygame.transform.scale(image, (TILE_SIZE, TILE_SIZE))
         images[key] = image
+        loaded.append(key)
 
-    loaded_theme_name = theme.name
+    print("[AutoTile] loaded:", loaded)
 
 
 def set_tile(x, y, tile):
@@ -61,20 +115,13 @@ def generate_boss_room():
     for y in range(MAP_HEIGHT):
         game_map.append("#" * MAP_WIDTH)
 
-    # Large boss room
     create_room(3, 1, 14, 10)
-
-    # Start room
     create_room(2, 12, 5, 2)
 
-    # Connect start room to entrance
     create_h_tunnel(6, 10, 12)
-
-    # Entrance corridor
     create_v_tunnel(10, 12, 9)
     create_v_tunnel(10, 12, 10)
 
-    # Boss gate positions
     boss_gate_positions = [
         (9, 11),
         (10, 11),
@@ -236,13 +283,11 @@ def get_start_position():
 
 
 def get_random_floor_position(player=None, min_distance=0):
-    walkable_tiles = [".", "g", "~"]
-
     while True:
         x = random.randint(1, MAP_WIDTH - 2)
         y = random.randint(1, MAP_HEIGHT - 2)
 
-        if game_map[y][x] not in walkable_tiles:
+        if game_map[y][x] not in [".", "g", "~"]:
             continue
 
         if player is not None:
@@ -254,6 +299,102 @@ def get_random_floor_position(player=None, min_distance=0):
         return x, y
 
 
+def is_inside_map(x, y):
+    return 0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT
+
+
+def get_tile(x, y):
+    if not is_inside_map(x, y):
+        return "#"
+
+    return game_map[y][x]
+
+
+def is_walkable_tile(x, y):
+    return get_tile(x, y) in WALKABLE_TILES
+
+
+def is_wall_tile(x, y):
+    return get_tile(x, y) == "#"
+
+
+def choose_floor_image_key(x, y, tile):
+    if tile == "g":
+        if "floor_moss" in images:
+            return "floor_moss"
+
+    if tile == "~":
+        if "~" in images:
+            return "~"
+
+    if tile == ">":
+        if ">" in images:
+            return ">"
+
+    value = (x * 23 + y * 41) % 100
+
+    if value < 18 and "floor_2" in images:
+        return "floor_2"
+
+    if value < 28 and "floor_crack" in images:
+        return "floor_crack"
+
+    if value < 38 and "floor_moss" in images:
+        return "floor_moss"
+
+    if "floor" in images:
+        return "floor"
+
+    return "."
+
+
+def choose_wall_image_key(x, y):
+    floor_up = is_walkable_tile(x, y - 1)
+    floor_down = is_walkable_tile(x, y + 1)
+    floor_left = is_walkable_tile(x - 1, y)
+    floor_right = is_walkable_tile(x + 1, y)
+
+    if floor_down and floor_right and "wall_tl" in images:
+        return "wall_tl"
+
+    if floor_down and floor_left and "wall_tr" in images:
+        return "wall_tr"
+
+    if floor_up and floor_right and "wall_bl" in images:
+        return "wall_bl"
+
+    if floor_up and floor_left and "wall_br" in images:
+        return "wall_br"
+
+    if floor_down and "wall_top" in images:
+        return "wall_top"
+
+    if floor_up and "wall_bottom" in images:
+        return "wall_bottom"
+
+    if floor_right and "wall_left" in images:
+        return "wall_left"
+
+    if floor_left and "wall_right" in images:
+        return "wall_right"
+
+    value = (x * 19 + y * 37) % 100
+
+    if value < 6 and "wall_fill1" in images:
+        return "wall_fill1"
+
+    if value < 10 and "wall_fill2" in images:
+        return "wall_fill2"
+
+    if "wall_center" in images:
+        return "wall_center"
+
+    if "wall" in images:
+        return "wall"
+
+    return "#"
+
+
 def draw_map(screen, theme=None):
     if theme is not None:
         screen.fill(theme.background_color)
@@ -263,7 +404,14 @@ def draw_map(screen, theme=None):
         for x in range(MAP_WIDTH):
             tile = game_map[y][x]
 
-            if tile in images:
-                screen.blit(images[tile], (x * TILE_SIZE, y * TILE_SIZE))
+            if tile == "#":
+                key = choose_wall_image_key(x, y)
             else:
+                key = choose_floor_image_key(x, y, tile)
+
+            if key in images:
+                screen.blit(images[key], (x * TILE_SIZE, y * TILE_SIZE))
+            elif tile in images:
+                screen.blit(images[tile], (x * TILE_SIZE, y * TILE_SIZE))
+            elif "." in images:
                 screen.blit(images["."], (x * TILE_SIZE, y * TILE_SIZE))

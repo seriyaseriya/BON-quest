@@ -16,6 +16,7 @@ from systems.interaction_system import InteractionSystem
 from systems.spawn_system import SpawnSystem
 from systems.item_pickup_system import ItemPickupSystem
 from systems.floor_transition_system import FloorTransitionSystem
+from systems.decoration_system import DecorationSystem
 
 from managers.enemy_manager import EnemyManager
 from managers.effect_manager import EffectManager
@@ -23,6 +24,8 @@ from managers.ui_manager import UIManager
 from managers.game_state_manager import GameStateManager
 from managers.ability_manager import AbilityManager
 from managers.projectile_manager import ProjectileManager
+from systems.shadow_system import ShadowSystem
+from managers.particle_manager import ParticleManager
 
 from dungeon.game_map import (
     game_map,
@@ -48,6 +51,7 @@ class PlayScene:
         self.spawn_system = SpawnSystem()
         self.item_pickup_system = ItemPickupSystem()
         self.floor_transition_system = FloorTransitionSystem()
+        self.decoration_system = DecorationSystem()
 
         self.enemy_manager = EnemyManager()
         self.effect_manager = EffectManager()
@@ -56,6 +60,8 @@ class PlayScene:
 
         self.ability_manager = AbilityManager()
         self.projectile_manager = ProjectileManager()
+        self.shadow_system = ShadowSystem()
+        self.particle_manager = ParticleManager()
 
         self.reset()
 
@@ -64,7 +70,6 @@ class PlayScene:
         self.state.reset()
 
         self.player = Player()
-
         self.inventory = Inventory()
 
         self.ability_manager = AbilityManager()
@@ -106,6 +111,8 @@ class PlayScene:
         self.effect_manager.clear()
         self.enemy_manager.clear()
         self.projectile_manager.clear()
+        self.decoration_system.clear()
+        self.particle_manager.clear()
 
         if self.floor_system.is_boss_floor():
             self.enemy_manager.setup_boss_floor(
@@ -124,8 +131,32 @@ class PlayScene:
                 self.floor_system.floor
             )
 
+        reserved_positions = self.create_reserved_positions()
+
+        self.decoration_system.generate(
+            theme,
+            reserved_positions,
+            self.floor_system.is_boss_floor(),
+        )
+
         self.floor_intro_timer = 90
         self.floor_intro_text = self.floor_system.get_floor_name()
+
+    def create_reserved_positions(self):
+        reserved = set()
+
+        reserved.add((self.player.x, self.player.y))
+
+        for item in self.items:
+            reserved.add((item.x, item.y))
+
+        for chest in self.chests:
+            reserved.add((chest.x, chest.y))
+
+        for enemy in self.enemy_manager.get_collision_targets():
+            reserved.add((enemy.x, enemy.y))
+
+        return reserved
 
     def next_floor(self):
         self.floor_system.next_floor()
@@ -145,7 +176,7 @@ class PlayScene:
         if key == pygame.K_r:
             self.reset()
             return
-        
+
         if key == pygame.K_7:
             self.floor_system.floor = 29
             self.next_floor()
@@ -278,6 +309,12 @@ class PlayScene:
         self.set_message(message)
 
         self.reward_choices = []
+
+        self.particle_manager.spawn_treasure(
+            self.player.x,
+            self.player.y,
+        )
+
         self.state.close_reward()
 
     def handle_target_defeated(self, defeated_target):
@@ -292,6 +329,11 @@ class PlayScene:
             self.inventory,
             self.items,
         )
+        
+        self.particle_manager.spawn_enemy_defeat(
+            defeated_enemy.x,
+            defeated_enemy.y,
+        )
 
         self.set_message(message)
 
@@ -301,6 +343,12 @@ class PlayScene:
             self.start_level_up()
 
     def handle_boss_defeated(self):
+        if self.enemy_manager.boss is not None:
+            self.particle_manager.spawn_enemy_defeat(
+                self.enemy_manager.boss.x,
+                self.enemy_manager.boss.y,
+            )
+
         self.set_message("KING RAT defeated!")
 
         leveled = self.player.gain_exp(5)
@@ -329,6 +377,8 @@ class PlayScene:
             game_map,
         )
 
+        self.particle_manager.update()
+
         self.ability_manager.update(
             self.player,
             self.projectile_manager,
@@ -343,6 +393,7 @@ class PlayScene:
         )
 
         self.effect_manager.update()
+        self.decoration_system.update()
 
         message = self.item_pickup_system.pickup_items(
             self.player,
@@ -378,6 +429,16 @@ class PlayScene:
             self.floor_system.get_theme(),
         )
 
+        self.decoration_system.draw(self.screen)
+
+        self.shadow_system.draw_entity_shadows(
+            self.screen,
+            self.player,
+            self.items,
+            self.chests,
+            self.enemy_manager,
+        )
+
         for item in self.items:
             item.draw(self.screen)
 
@@ -391,6 +452,8 @@ class PlayScene:
         self.player.draw(self.screen)
 
         self.effect_manager.draw(self.screen)
+
+        self.particle_manager.draw(self.screen)
 
     def draw_ui(self):
         self.ui_manager.draw(

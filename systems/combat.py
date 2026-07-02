@@ -26,6 +26,7 @@ class CombatSystem:
         effect_manager,
         on_enemy_defeated,
         on_boss_defeated,
+        on_enemy_hit=None,
     ):
         delta = self.get_move_delta(key)
 
@@ -48,6 +49,9 @@ class CombatSystem:
 
         if result in ["enemy_hit", "enemy_defeated"]:
             effect_manager.add_attack_effect(enemy.x, enemy.y, damage)
+
+            if on_enemy_hit is not None:
+                on_enemy_hit(enemy, damage)
 
         if result == "enemy_defeated":
             if enemy == enemy_manager.boss:

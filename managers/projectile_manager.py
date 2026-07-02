@@ -39,19 +39,34 @@ class ProjectileManager:
         self.add(projectile)
         return projectile
 
-    def update(self, game_map=None, enemies=None, on_enemy_defeated=None):
+    def update(
+        self,
+        game_map=None,
+        enemies=None,
+        on_enemy_defeated=None,
+        on_enemy_hit=None,
+    ):
         for projectile in self.projectiles:
             projectile.update(game_map)
 
         if enemies is not None:
-            self.handle_enemy_collision(enemies, on_enemy_defeated)
+            self.handle_enemy_collision(
+                enemies,
+                on_enemy_defeated,
+                on_enemy_hit,
+            )
 
         self.projectiles = [
             projectile for projectile in self.projectiles
             if projectile.alive
         ]
 
-    def handle_enemy_collision(self, enemies, on_enemy_defeated=None):
+    def handle_enemy_collision(
+        self,
+        enemies,
+        on_enemy_defeated=None,
+        on_enemy_hit=None,
+    ):
         for projectile in self.projectiles:
             if not projectile.alive:
                 continue
@@ -64,6 +79,9 @@ class ProjectileManager:
                     continue
 
                 if self.is_hit(projectile, enemy):
+                    if on_enemy_hit is not None:
+                        on_enemy_hit(enemy, projectile.damage)
+
                     result = enemy.take_damage(projectile.damage)
 
                     if result and on_enemy_defeated is not None:
@@ -89,8 +107,9 @@ class ProjectileManager:
             height = 1
 
         from settings import TILE_SIZE
+        import pygame
 
-        return __import__("pygame").Rect(
+        return pygame.Rect(
             enemy.x * TILE_SIZE,
             enemy.y * TILE_SIZE,
             width * TILE_SIZE,
