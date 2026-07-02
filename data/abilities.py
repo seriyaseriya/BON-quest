@@ -28,10 +28,11 @@ ABILITY_DATA = {
 
     "intimidate": {
         "name": "威嚇",
-        "rarity": "uncommon",
+        "rarity": "rare",
         "max_level": ABILITY_MAX_LEVEL,
         "cooldown": 300,
         "description": "周囲の敵をスタンさせる",
+        "reward_source": "chest",
     },
 
     "scratch": {
@@ -44,7 +45,7 @@ ABILITY_DATA = {
 
     "barrier": {
         "name": "バリア",
-        "rarity": "rare",
+        "rarity": "uncommon",
         "max_level": ABILITY_MAX_LEVEL,
         "cooldown": 600,
         "description": "一定ダメージを肩代わりする",
@@ -69,8 +70,8 @@ ABILITY_DATA = {
 
 
 RARITY_WEIGHTS = {
-    "common": 60,
-    "uncommon": 28,
-    "rare": 10,
-    "legendary": 2,
+    "common": 55,
+    "uncommon": 30,
+    "rare": 12,
+    "legendary": 3,
 }

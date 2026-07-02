@@ -1,7 +1,63 @@
 import pygame
 
 from settings import *
-from data.abilities import ABILITY_DATA
+
+
+ABILITY_ICONS = {
+    "soccer_ball": "⚽",
+    "mouse_bomb": "B",
+    "cat_beam": "☄",
+    "lullaby": "♪",
+    "intimidate": "!",
+    "scratch": "爪",
+    "barrier": "盾",
+    "purr": "♡",
+}
+
+
+RARITY_COLORS = {
+    "common": (190, 190, 190),
+    "uncommon": (90, 220, 120),
+    "rare": (80, 150, 255),
+    "legendary": (255, 190, 70),
+}
+
+
+def draw_ability_icon(screen, font, ability, x, y):
+    rarity = ability["rarity"]
+    color = RARITY_COLORS.get(rarity, (190, 190, 190))
+
+    rect = pygame.Rect(x, y, 38, 38)
+
+    surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    pygame.draw.rect(
+        surface,
+        (24, 20, 30, 155),
+        (0, 0, rect.width, rect.height),
+        border_radius=10,
+    )
+    screen.blit(surface, (rect.x, rect.y))
+
+    pygame.draw.rect(screen, color, rect, 2, border_radius=10)
+
+    icon = ABILITY_ICONS.get(ability["id"], "★")
+    icon_text = font.render(icon, True, color)
+    screen.blit(
+        icon_text,
+        (
+            rect.centerx - icon_text.get_width() // 2,
+            rect.y + 6,
+        ),
+    )
+
+    lv_text = font.render(str(ability["level"]), True, WHITE)
+    screen.blit(
+        lv_text,
+        (
+            rect.right - lv_text.get_width() - 5,
+            rect.bottom - lv_text.get_height() - 3,
+        ),
+    )
 
 
 def draw_ability_ui(screen, ability_manager):
@@ -12,16 +68,14 @@ def draw_ability_ui(screen, ability_manager):
 
     font = pygame.font.SysFont(None, 20)
 
-    x = INTERNAL_WIDTH - 160
-    y = 12
+    start_x = INTERNAL_WIDTH - 178
+    start_y = 10
 
-    title = font.render("Abilities", True, (255, 255, 255))
-    screen.blit(title, (x, y))
+    for index, ability in enumerate(abilities):
+        col = index % 4
+        row = index // 4
 
-    y += 22
+        x = start_x + col * 42
+        y = start_y + row * 42
 
-    for ability in abilities:
-        text = f"{ability['name']} Lv{ability['level']}"
-        image = font.render(text, True, (255, 255, 255))
-        screen.blit(image, (x, y))
-        y += 20
+        draw_ability_icon(screen, font, ability, x, y)

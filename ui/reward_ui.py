@@ -2,71 +2,100 @@ import pygame
 
 from settings import *
 from ui.font_manager import get_title_font, get_menu_font
+from ui.reward_card import draw_reward_card
+from ui.reward_animation import (
+    get_reward_timer,
+    get_title_float,
+    get_card_slide_offset,
+)
+from ui.reward_effect import (
+    draw_overlay,
+    draw_chest_effect,
+    draw_levelup_effect,
+)
 
 
-def get_rarity_color(reward):
-    if reward.rarity == "rare":
-        return RARITY_RARE
+def is_chest_reward_screen(choices):
+    for reward in choices:
+        if reward.source == "chest":
+            return True
 
-    if reward.rarity == "epic":
-        return RARITY_EPIC
-
-    if reward.rarity == "legendary":
-        return RARITY_LEGENDARY
-
-    return RARITY_COMMON
+    return False
 
 
-def draw_reward_card(screen, reward, index, x, y, width, height, font):
-    frame_color = get_rarity_color(reward)
+def draw_reward_title(screen, title_font, font, timer, mode):
+    title_float = get_title_float(timer)
 
-    pygame.draw.rect(screen, UI_PANEL_DARK, (x, y, width, height))
-    pygame.draw.rect(screen, frame_color, (x, y, width, height), 3)
+    if mode == "chest":
+        title_text = "Treasure Reward!"
+        subtitle_text = "Choose one treasure from the chest"
+        title_color = (255, 220, 120)
+    elif mode == "level":
+        title_text = "Level Up!"
+        subtitle_text = "Choose one power for Milk"
+        title_color = (160, 220, 255)
+    else:
+        title_text = "Choose Your Reward"
+        subtitle_text = "Select one card with number keys"
+        title_color = UI_TITLE
 
-    number_text = font.render(str(index + 1), True, UI_TITLE)
-    screen.blit(number_text, (x + 12, y + 10))
+    title = title_font.render(title_text, True, title_color)
+    title_x = WIDTH // 2 - title.get_width() // 2
+    title_y = int(48 + title_float)
+    screen.blit(title, (title_x, title_y))
 
-    icon_text = font.render(reward.icon, True, frame_color)
-    icon_x = x + width - icon_text.get_width() - 12
-    screen.blit(icon_text, (icon_x, y + 10))
-
-    name_text = font.render(reward.name, True, UI_TEXT)
-    name_x = x + width // 2 - name_text.get_width() // 2
-    screen.blit(name_text, (name_x, y + 58))
-
-    desc_text = font.render(reward.description, True, UI_HELP)
-    desc_x = x + width // 2 - desc_text.get_width() // 2
-    screen.blit(desc_text, (desc_x, y + 95))
-
-    rarity_text = font.render(reward.rarity.upper(), True, frame_color)
-    rarity_x = x + width // 2 - rarity_text.get_width() // 2
-    screen.blit(rarity_text, (rarity_x, y + 130))
-
-    help_text = font.render(f"Press {index + 1}", True, UI_TITLE)
-    help_x = x + width // 2 - help_text.get_width() // 2
-    screen.blit(help_text, (help_x, y + 165))
+    subtitle = font.render(subtitle_text, True, UI_HELP)
+    subtitle_x = WIDTH // 2 - subtitle.get_width() // 2
+    screen.blit(subtitle, (subtitle_x, title_y + 52))
 
 
-def draw_reward_choices(screen, choices):
-    overlay = pygame.Surface((WIDTH, HEIGHT))
-    overlay.set_alpha(UI_OVERLAY_ALPHA)
-    overlay.fill(BLACK)
-    screen.blit(overlay, (0, 0))
+def draw_reward_cards(screen, choices, font, timer, mode):
+    card_width = 178
+    card_height = 232
+    gap = 24
+
+    total_width = card_width * len(choices) + gap * (len(choices) - 1)
+    start_x = WIDTH // 2 - total_width // 2
+    base_y = 145
+
+    for index, reward in enumerate(choices):
+        x = start_x + index * (card_width + gap)
+        y = base_y + get_card_slide_offset(timer, index)
+
+        draw_reward_card(
+            screen,
+            reward,
+            index,
+            x,
+            y,
+            card_width,
+            card_height,
+            font,
+            timer,
+            mode,
+        )
+
+
+def draw_reward_screen(screen, choices, mode="reward"):
+    if not choices:
+        return
+
+    timer = get_reward_timer(draw_reward_screen)
 
     title_font = get_title_font()
     font = get_menu_font()
 
-    title = title_font.render("Choose Your Reward", True, UI_TITLE)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 55))
+    draw_overlay(screen, timer, mode)
 
-    card_width = 170
-    card_height = 205
-    gap = 22
+    if mode == "chest":
+        draw_chest_effect(screen, timer)
+    elif mode == "level":
+        draw_levelup_effect(screen, timer)
 
-    total_width = card_width * len(choices) + gap * (len(choices) - 1)
-    start_x = WIDTH // 2 - total_width // 2
-    y = 150
+    draw_reward_title(screen, title_font, font, timer, mode)
+    draw_reward_cards(screen, choices, font, timer, mode)
 
-    for index, reward in enumerate(choices):
-        x = start_x + index * (card_width + gap)
-        draw_reward_card(screen, reward, index, x, y, card_width, card_height, font)
+
+def draw_reward_choices(screen, choices):
+    mode = "chest" if is_chest_reward_screen(choices) else "reward"
+    draw_reward_screen(screen, choices, mode)

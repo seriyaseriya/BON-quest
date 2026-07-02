@@ -71,7 +71,7 @@ class AbilityManager:
                 on_enemy_defeated,
             )
 
-    def get_random_ability_choices(self, count=3):
+    def get_random_ability_choices(self, count=3, source="level"):
         candidates = []
 
         for ability_id, data in ABILITY_DATA.items():
@@ -79,6 +79,11 @@ class AbilityManager:
             max_level = data["max_level"]
 
             if current_level >= max_level:
+                continue
+
+            reward_source = data.get("reward_source", "level")
+
+            if source == "level" and reward_source == "chest":
                 continue
 
             weight = RARITY_WEIGHTS.get(data["rarity"], 1)

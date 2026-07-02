@@ -11,9 +11,10 @@ class Reward:
         kind,
         value=0,
         ability_id=None,
-        source="both",
+        source="level",
         icon="?",
         rarity="common",
+        chest_limited=False,
     ):
         self.name = name
         self.description = description
@@ -23,92 +24,32 @@ class Reward:
         self.source = source
         self.icon = icon
         self.rarity = rarity
+        self.chest_limited = chest_limited
 
 
 class RewardSystem:
     def __init__(self):
         self.reward_pool = [
-            Reward(
-                "Coin Pouch",
-                "Coins +30",
-                "coins",
-                30,
-                source="chest",
-                icon="G",
-                rarity="common",
-            ),
-            Reward(
-                "Potion Set",
-                "Potion +2",
-                "potion",
-                2,
-                source="chest",
-                icon="P",
-                rarity="common",
-            ),
-            Reward(
-                "Vital Fish",
-                "Max HP +3",
-                "max_hp",
-                3,
-                source="both",
-                icon="HP",
-                rarity="common",
-            ),
-            Reward(
-                "Power Claw",
-                "Attack +1",
-                "attack",
-                1,
-                source="both",
-                icon="ATK",
-                rarity="common",
-            ),
-            Reward(
-                "Warm Milk",
-                "Heal +5",
-                "heal",
-                5,
-                source="level",
-                icon="HEAL",
-                rarity="common",
-            ),
-            Reward(
-                "Healing Milk",
-                "Full Heal",
-                "full_heal",
-                0,
-                source="both",
-                icon="FULL",
-                rarity="rare",
-            ),
-            Reward(
-                "Rare Weapon",
-                "Royal Sword",
-                "rare_weapon",
-                1,
-                source="chest",
-                icon="WPN",
-                rarity="epic",
-            ),
-            Reward(
-                "Rare Collar",
-                "Royal Armor",
-                "rare_armor",
-                1,
-                source="chest",
-                icon="ARM",
-                rarity="epic",
-            ),
+            Reward("Coin Pouch", "Coins +30", "coins", 30, source="level", icon="G", rarity="common"),
+            Reward("Potion Set", "Potion +2", "potion", 2, source="level", icon="P", rarity="common"),
+            Reward("Vital Fish", "Max HP +3", "max_hp", 3, source="level", icon="HP", rarity="common"),
+            Reward("Power Claw", "Attack +1", "attack", 1, source="level", icon="ATK", rarity="common"),
+            Reward("Warm Milk", "Heal +5", "heal", 5, source="level", icon="HEAL", rarity="common"),
+            Reward("Healing Milk", "Full Heal", "full_heal", 0, source="level", icon="FULL", rarity="uncommon"),
+
+            Reward("Cat Can", "Max HP +8", "max_hp", 8, source="chest", icon="CAN", rarity="uncommon", chest_limited=True),
+            Reward("Lucky Charm", "Better Rare Rewards", "luck", 1, source="chest", icon="LCK", rarity="rare", chest_limited=True),
+            Reward("Gold Bell", "Coin Gain +25%", "coin_multiplier", 25, source="chest", icon="BEL", rarity="rare", chest_limited=True),
+            Reward("Royal Cat Relic", "Legendary Equipment", "legendary_item", 1, source="chest", icon="REL", rarity="legendary", chest_limited=True),
         ]
 
-    def create_choices(self, count=3, source=None):
-        if source is None:
-            pool = self.reward_pool
+    def create_choices(self, count=3, source="level"):
+        if source == "chest":
+            pool = self.reward_pool[:]
         else:
             pool = [
                 reward for reward in self.reward_pool
-                if reward.source == source or reward.source == "both"
+                if reward.source == "level"
             ]
 
         if len(pool) <= count:
@@ -122,15 +63,20 @@ class RewardSystem:
     def create_level_choices(self, count=3):
         return self.create_choices(count, "level")
 
-    def create_ability_rewards(self, ability_manager, count=3):
+    def create_ability_rewards(self, ability_manager, count=3, source="level"):
         rewards = []
 
-        ability_ids = ability_manager.get_random_ability_choices(count)
+        ability_ids = ability_manager.get_random_ability_choices(
+            count,
+            source,
+        )
 
         for ability_id in ability_ids:
             data = ABILITY_DATA[ability_id]
             current_level = ability_manager.get_level(ability_id)
             next_level = current_level + 1
+            reward_source = data.get("reward_source", "level")
+            chest_limited = reward_source == "chest"
 
             rewards.append(
                 Reward(
@@ -138,9 +84,10 @@ class RewardSystem:
                     f"{data['description']} / Lv{next_level}",
                     "ability",
                     ability_id=ability_id,
-                    source="both",
+                    source=reward_source,
                     icon="★",
                     rarity=data["rarity"],
+                    chest_limited=chest_limited,
                 )
             )
 
@@ -154,11 +101,11 @@ class RewardSystem:
         ability_rewards = self.create_ability_rewards(
             ability_manager,
             ability_count,
+            source="level",
         )
 
         choices = normal_rewards + ability_rewards
         random.shuffle(choices)
-
         return choices[:count]
 
     def create_mixed_chest_choices(self, ability_manager, count=3):
@@ -169,11 +116,11 @@ class RewardSystem:
         ability_rewards = self.create_ability_rewards(
             ability_manager,
             ability_count,
+            source="chest",
         )
 
         choices = normal_rewards + ability_rewards
         random.shuffle(choices)
-
         return choices[:count]
 
     def apply_reward(self, reward, player, inventory, ability_manager=None):
@@ -183,7 +130,6 @@ class RewardSystem:
 
             ability_manager.add_or_level_up(reward.ability_id)
             level = ability_manager.get_level(reward.ability_id)
-
             return f"{reward.name} Lv{level}!"
 
         if reward.kind == "coins":
@@ -211,16 +157,29 @@ class RewardSystem:
 
             return f"HP +{reward.value}!"
 
-        if reward.kind == "rare_weapon":
-            player.equipment.equip_weapon("王家のネコソード", 4)
-            return "Equipped 王家のネコソード!"
-
-        if reward.kind == "rare_armor":
-            player.equipment.equip_armor("王家の首輪", 4)
-            return "Equipped 王家の首輪!"
-
         if reward.kind == "full_heal":
             player.hp = player.max_hp
             return "HP fully healed!"
+
+        if reward.kind == "luck":
+            if hasattr(player, "luck"):
+                player.luck += reward.value
+            else:
+                player.luck = reward.value
+
+            return "Luck increased!"
+
+        if reward.kind == "coin_multiplier":
+            if hasattr(player, "coin_multiplier"):
+                player.coin_multiplier += reward.value
+            else:
+                player.coin_multiplier = reward.value
+
+            return f"Coin Gain +{reward.value}%!"
+
+        if reward.kind == "legendary_item":
+            player.equipment.equip_weapon("王家のネコソード", 6)
+            player.equipment.equip_armor("王家の首輪", 6)
+            return "Equipped Royal Cat Relic!"
 
         return "Got reward!"
