@@ -101,6 +101,37 @@ def generate_floor(is_boss=False, theme=None):
     else:
         generate_map(theme)
 
+def generate_bonus_floor():
+    global game_map
+
+    width = len(game_map[0])
+    height = len(game_map)
+
+    WALL = 1
+    FLOOR = 0
+    STAIRS = 2
+
+    for y in range(height):
+        for x in range(width):
+            game_map[y][x] = WALL
+
+    margin_x = 4
+    margin_y = 4
+
+    for y in range(margin_y, height - margin_y):
+        for x in range(margin_x, width - margin_x):
+            game_map[y][x] = FLOOR
+
+    center_x = width // 2
+    center_y = height // 2
+
+    for y in range(center_y - 3, center_y + 4):
+        for x in range(center_x - 3, center_x + 4):
+            if 0 <= x < width and 0 <= y < height:
+                game_map[y][x] = FLOOR
+
+    game_map[height - margin_y - 2][center_x] = STAIRS
+
 
 def generate_boss_room():
     global boss_position
@@ -415,3 +446,34 @@ def draw_map(screen, theme=None):
                 screen.blit(images[tile], (x * TILE_SIZE, y * TILE_SIZE))
             elif "." in images:
                 screen.blit(images["."], (x * TILE_SIZE, y * TILE_SIZE))
+
+def generate_bonus_floor():
+    global game_map
+
+    height = len(game_map)
+    width = len(game_map[0])
+
+    rows = []
+
+    for y in range(height):
+        row = ""
+
+        for x in range(width):
+            if x == 0 or y == 0 or x == width - 1 or y == height - 1:
+                row += "#"
+            elif x < 3 or x >= width - 3 or y < 3 or y >= height - 3:
+                row += "#"
+            else:
+                row += "."
+
+        rows.append(row)
+
+    center_x = width // 2
+    stair_y = height - 5
+
+    stair_row = list(rows[stair_y])
+    stair_row[center_x] = ">"
+    rows[stair_y] = "".join(stair_row)
+
+    # 重要：再代入ではなく中身を差し替える
+    game_map[:] = rows

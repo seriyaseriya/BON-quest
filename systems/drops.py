@@ -1,46 +1,89 @@
 import random
 
 from entities.item import Item
+from data.drop_tables import (
+    get_rarity_table,
+    get_theme_equipment_table,
+)
 
 
 class DropSystem:
-    def create_random_equipment_drop(self, x, y):
-        roll = random.random()
+    def roll_weighted(self, table):
+        total = sum(weight for _, weight in table)
 
-        if roll < 0.5:
-            weapons = [
-                ("小魚ソード", 1),
-                ("サンマブレード", 2),
-                ("マグロソード", 3),
-                ("伝説のネコパンチ", 5),
-            ]
+        if total <= 0:
+            return None
 
-            name, power = random.choice(weapons)
-            return Item(x, y, "weapon", name, power)
+        roll = random.randint(1, total)
+        current = 0
 
-        armors = [
-            ("毛糸の首輪", 1),
-            ("革の首輪", 2),
-            ("銀の首輪", 3),
-            ("王家の首輪", 5),
-        ]
+        for value, weight in table:
+            current += weight
 
-        name, power = random.choice(armors)
-        return Item(x, y, "armor", name, power)
+            if roll <= current:
+                return value
 
-    def drop_from_enemy(self, enemy, inventory, items):
+        return table[0][0]
+
+    def roll_equipment_id(self, floor, theme):
+        rarity = self.roll_weighted(
+            get_rarity_table(floor)
+        )
+
+        if rarity is None:
+            return None
+
+        equipment_table = get_theme_equipment_table(theme)
+        candidates = equipment_table.get(rarity, [])
+
+        if len(candidates) <= 0:
+            return None
+
+        return random.choice(candidates)
+
+    def drop_from_enemy(
+        self,
+        enemy,
+        inventory,
+        items,
+        floor=1,
+        theme="cave",
+    ):
         coin_amount = random.randint(1, 5)
+
+        coin_bonus = 0
+        if hasattr(inventory, "player"):
+            coin_bonus = 0
+
         inventory.add_coins(coin_amount)
 
         roll = random.random()
 
         if roll < 0.25:
-            items.append(Item(enemy.x, enemy.y, "potion"))
-            return f"Got {coin_amount} coins! Potion dropped!"
+            items.append(
+                Item(
+                    enemy.x,
+                    enemy.y,
+                    "potion",
+                )
+            )
+            return f"{coin_amount}G とポーションを落とした！"
 
         if roll < 0.45:
-            equipment = self.create_random_equipment_drop(enemy.x, enemy.y)
-            items.append(equipment)
-            return f"Got {coin_amount} coins! Equipment dropped!"
+            equipment_id = self.roll_equipment_id(
+                floor,
+                theme,
+            )
 
-        return f"Got {coin_amount} coins!"
+            if equipment_id is not None:
+                items.append(
+                    Item(
+                        enemy.x,
+                        enemy.y,
+                        "equipment",
+                        equipment_id,
+                    )
+                )
+                return f"{coin_amount}G と装備品を落とした！"
+
+        return f"{coin_amount}G を手に入れた！"

@@ -72,6 +72,7 @@ class UIManager:
         show_equipment,
         show_reward_choices,
         reward_choices,
+        equipment_selected_index,
     ):
         hud_message = self.get_hud_message(
             player,
@@ -108,7 +109,12 @@ class UIManager:
             draw_inventory(screen, inventory, player)
 
         if show_equipment:
-            draw_equipment(screen, player)
+            draw_equipment(
+                screen,
+                player,
+                inventory,
+                equipment_selected_index,
+            )
 
         if show_reward_choices:
             draw_reward_choices(screen, reward_choices)

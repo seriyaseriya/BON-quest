@@ -1,6 +1,7 @@
 import pygame
 from settings import *
 from equipment import Equipment
+from systems.equipment_system import EquipmentSystem
 
 
 class Player:
@@ -24,6 +25,9 @@ class Player:
         self.exp_to_next = 3
 
         self.equipment = Equipment()
+
+        self.base_max_hp = self.max_hp
+        self.equipment = EquipmentSystem()
 
         self.images = {
             "front": pygame.image.load("assets/milk_front.png").convert_alpha(),
@@ -72,6 +76,9 @@ class Player:
 
     def get_total_attack(self):
         return self.attack + self.equipment.get_attack_bonus()
+    
+    def get_total_defense(self):
+        return self.equipment.get_defense_bonus()
 
     def is_enemy_at_position(self, enemy, x, y):
         if hasattr(enemy, "occupies_position"):

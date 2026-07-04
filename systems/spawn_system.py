@@ -15,8 +15,12 @@ from dungeon.game_map import (
 
 
 class SpawnSystem:
-    def create_enemies(self, player, floor):
+    def create_enemies(self, player, floor, is_bonus_floor=False):
         enemies = []
+
+        if is_bonus_floor:
+            return enemies
+
         enemy_count = 2 + floor
 
         while len(enemies) < enemy_count:
@@ -34,10 +38,13 @@ class SpawnSystem:
 
         return enemies
 
-    def create_items(self, player, is_boss_floor):
+    def create_items(self, player, is_boss_floor, is_bonus_floor=False):
         items = []
 
         if is_boss_floor:
+            return items
+
+        if is_bonus_floor:
             return items
 
         for _ in range(3):
