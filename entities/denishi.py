@@ -24,12 +24,7 @@ class Denishi(LargeBoss):
         self.walk_cooldown = 0
         self.attack_cooldown_extra = 0
 
-        self.set_arena(
-            3,
-            1,
-            16,
-            9,
-        )
+        self.set_arena(3, 1, 16, 9)
 
         self.skill_manager.add_skill(
             FeintMoveSkill(
@@ -61,12 +56,12 @@ class Denishi(LargeBoss):
         self.update_denishi_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.attack_player(
-                player,
-                self.attack,
-                40,
-            )
+        if self.handle_melee_attack(
+            player,
+            self.attack,
+            cooldown=40,
+            warning_time=34,
+        ):
             return
 
         self.weird_walk(game_map, player)
@@ -129,12 +124,8 @@ class Denishi(LargeBoss):
         return 8
 
     def draw(self, screen, camera_x=0, camera_y=0):
-        self.skill_manager.draw(
-            screen,
-            self,
-            camera_x,
-            camera_y,
-        )
+        self.skill_manager.draw(screen, self, camera_x, camera_y)
+        self.draw_melee_warning(screen, camera_x, camera_y)
 
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
@@ -148,18 +139,9 @@ class Denishi(LargeBoss):
         else:
             pygame.draw.rect(screen, (120, 80, 180), rect)
 
-        if self.phase == 2:
-            pygame.draw.rect(
-                screen,
-                (180, 120, 255),
-                rect,
-                2,
-            )
+        self.draw_body_warning(screen, rect)
 
+        if self.phase == 2:
+            pygame.draw.rect(screen, (180, 120, 255), rect, 2)
         elif self.phase == 3:
-            pygame.draw.rect(
-                screen,
-                (255, 80, 220),
-                rect,
-                3,
-            )
+            pygame.draw.rect(screen, (255, 80, 220), rect, 3)

@@ -1,3 +1,6 @@
+import pygame
+
+from settings import *
 from entities.boss import Boss
 from managers.boss_skill_manager import BossSkillManager
 
@@ -12,9 +15,13 @@ class LargeBoss(Boss):
         self.move_cooldown = 0
         self.attack_cooldown = 0
 
+        self.melee_warning_timer = 0
+        self.melee_warning_time = 18
+        self.melee_warning_damage = 0
+        self.melee_warning_cooldown = 55
+
         self.skill_manager = BossSkillManager()
 
-        # Boss movement area
         self.arena_left = 0
         self.arena_top = 0
         self.arena_right = 999
@@ -47,6 +54,69 @@ class LargeBoss(Boss):
                     return True
 
         return False
+
+    def get_melee_warning_tiles(self):
+        tiles = []
+
+        for y in range(self.y - 1, self.y + self.height + 1):
+            for x in range(self.x - 1, self.x + self.width + 1):
+                if self.x <= x < self.x + self.width:
+                    if self.y <= y < self.y + self.height:
+                        continue
+
+                tiles.append((x, y))
+
+        return tiles
+
+    def start_melee_warning(self, damage=None, cooldown=55, warning_time=18):
+        if self.attack_cooldown > 0:
+            return False
+
+        if self.melee_warning_timer > 0:
+            return False
+
+        if damage is None:
+            damage = self.attack
+
+        self.melee_warning_timer = warning_time
+        self.melee_warning_time = warning_time
+        self.melee_warning_damage = damage
+        self.melee_warning_cooldown = cooldown
+
+        return True
+
+    def update_melee_warning(self, player):
+        if self.melee_warning_timer <= 0:
+            return False
+
+        self.melee_warning_timer -= 1
+
+        if self.melee_warning_timer > 0:
+            return True
+
+        if self.is_next_to_player(player):
+            self.damage_player(
+                player,
+                self.melee_warning_damage,
+            )
+
+        self.attack_cooldown = self.melee_warning_cooldown
+        return True
+
+    def handle_melee_attack(self, player, damage=None, cooldown=55, warning_time=18):
+        if self.melee_warning_timer > 0:
+            self.update_melee_warning(player)
+            return True
+
+        if not self.is_next_to_player(player):
+            return False
+
+        self.start_melee_warning(
+            damage,
+            cooldown,
+            warning_time,
+        )
+        return True
 
     def damage_player(self, player, damage):
         actual_damage = max(
@@ -123,3 +193,48 @@ class LargeBoss(Boss):
             game_map,
             player,
         )
+
+    def draw_melee_warning(self, screen, camera_x=0, camera_y=0):
+        if self.melee_warning_timer <= 0:
+            return
+
+        alpha = 70
+
+        if self.melee_warning_timer % 8 < 4:
+            alpha = 130
+
+        for tile_x, tile_y in self.get_melee_warning_tiles():
+            rect = pygame.Rect(
+                tile_x * TILE_SIZE - camera_x,
+                tile_y * TILE_SIZE - camera_y,
+                TILE_SIZE,
+                TILE_SIZE,
+            )
+
+            warning = pygame.Surface(
+                (TILE_SIZE, TILE_SIZE),
+                pygame.SRCALPHA,
+            )
+            warning.fill((255, 40, 40, alpha))
+            screen.blit(warning, rect)
+
+            pygame.draw.rect(
+                screen,
+                (255, 90, 90),
+                rect,
+                2,
+            )
+
+    def draw_body_warning(self, screen, rect):
+        if self.melee_warning_timer <= 0:
+            return
+
+        if self.melee_warning_timer % 8 >= 4:
+            return
+
+        flash = pygame.Surface(
+            (rect.width, rect.height),
+            pygame.SRCALPHA,
+        )
+        flash.fill((255, 40, 40, 90))
+        screen.blit(flash, rect)

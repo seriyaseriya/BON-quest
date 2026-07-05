@@ -7,6 +7,7 @@ game_map = []
 images = {}
 loaded_theme_name = None
 rooms = []
+large_rooms = []
 
 boss_position = (10, 6)
 boss_gate_positions = []
@@ -231,6 +232,7 @@ def rooms_overlap(room1, room2):
 def generate_map(theme=None):
     game_map.clear()
     rooms.clear()
+    large_rooms.clear()
 
     for y in range(MAP_HEIGHT):
         game_map.append("#" * MAP_WIDTH)
@@ -238,6 +240,22 @@ def generate_map(theme=None):
     max_rooms = 8
     min_size = 4
     max_size = 7
+
+    has_large_room = random.random() < 0.35
+
+    if has_large_room:
+        large_w = random.randint(9, 12)
+        large_h = random.randint(7, 9)
+
+        large_x = random.randint(1, MAP_WIDTH - large_w - 2)
+        large_y = random.randint(1, MAP_HEIGHT - large_h - 2)
+
+        large_room = (large_x, large_y, large_w, large_h)
+
+        create_room(large_x, large_y, large_w, large_h)
+
+        rooms.append(large_room)
+        large_rooms.append(large_room)
 
     for _ in range(max_rooms):
         w = random.randint(min_size, max_size)
@@ -311,6 +329,9 @@ def get_start_position():
         return 4, 12
 
     return room_center(rooms[0])
+
+def get_large_rooms():
+    return large_rooms
 
 
 def get_random_floor_position(player=None, min_distance=0):

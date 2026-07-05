@@ -1,0 +1,31 @@
+{
+    "points": 3661,
+    "total_runs": 7,
+    "total_enemies_defeated": 54,
+    "total_bosses_defeated": 8,
+    "total_coins_earned": 0,
+    "highest_floor": 10,
+    "upgrades": {
+        "hp_1": 1,
+        "hp_2": 1,
+        "hp_3": 1,
+        "ability_soccer": 1,
+        "ability_purr": 1,
+        "ability_scratch": 1,
+        "ability_lullaby": 1,
+        "exp_1": 1,
+        "coin_bonus_1": 1,
+        "chest_1": 1,
+        "revive_1": 1,
+        "attack_1": 1,
+        "attack_2": 1,
+        "attack_3": 1,
+        "potion_1": 1,
+        "potion_2": 1,
+        "potion_3": 1,
+        "coin_1": 1,
+        "coin_2": 1,
+        "coin_3": 1
+    },
+    "achievements": {}
+}

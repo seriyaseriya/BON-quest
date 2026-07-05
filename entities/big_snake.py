@@ -69,12 +69,12 @@ class BigSnake(LargeBoss):
         self.update_common_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.attack_player(
-                player,
-                self.attack,
-                55,
-            )
+        if self.handle_melee_attack(
+            player,
+            self.attack,
+            cooldown=55,
+            warning_time=34,
+        ):
             return
 
         self.chase_player(
@@ -100,6 +100,12 @@ class BigSnake(LargeBoss):
             camera_y,
         )
 
+        self.draw_melee_warning(
+            screen,
+            camera_x,
+            camera_y,
+        )
+
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
             self.y * TILE_SIZE - camera_y,
@@ -111,6 +117,8 @@ class BigSnake(LargeBoss):
             screen.blit(BigSnake.image, rect)
         else:
             pygame.draw.rect(screen, (70, 140, 60), rect)
+
+        self.draw_body_warning(screen, rect)
 
         if self.phase == 2:
             pygame.draw.rect(

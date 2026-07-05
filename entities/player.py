@@ -49,6 +49,8 @@ class Player:
 
         self.walk_count = 0
 
+        self.freeze_timer = 0
+
     def gain_exp(self, amount):
         self.exp += amount
 
@@ -108,6 +110,9 @@ class Player:
             self.direction_y = -1
 
     def move(self, dx, dy, game_map, enemies):
+        if self.freeze_timer > 0:
+            return None
+
         self.update_direction(dx, dy)
 
         next_x = self.x + dx
@@ -124,16 +129,7 @@ class Player:
                 continue
 
             if self.is_enemy_at_position(enemy, next_x, next_y):
-                damage = self.get_total_attack()
-                result = enemy.take_damage(damage)
-
-                self.walk_count += 1
-
-                return (
-                    result,
-                    enemy,
-                    damage,
-                )
+                return None
 
         if game_map[next_y][next_x] in ["#", "~"]:
             return None
@@ -144,6 +140,10 @@ class Player:
         self.walk_count += 1
 
         return None
+    
+    def update(self):
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
 
     def draw(self, screen):
         offset_y = 0
@@ -151,10 +151,30 @@ class Player:
         if self.walk_count % 2 == 1:
             offset_y = -3
 
+        draw_x = self.x * TILE_SIZE
+        draw_y = self.y * TILE_SIZE + offset_y
+
         screen.blit(
             self.images[self.direction],
             (
-                self.x * TILE_SIZE,
-                self.y * TILE_SIZE + offset_y,
+                draw_x,
+                draw_y,
             ),
         )
+
+        if self.freeze_timer > 0:
+            freeze = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+            freeze.fill((120, 210, 255, 115))
+            screen.blit(freeze, (draw_x, draw_y))
+
+            pygame.draw.rect(
+                screen,
+                (180, 240, 255),
+                (
+                    draw_x,
+                    draw_y,
+                    TILE_SIZE,
+                    TILE_SIZE,
+                ),
+                2,
+            )

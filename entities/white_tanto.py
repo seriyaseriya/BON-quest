@@ -22,12 +22,7 @@ class WhiteTanto(LargeBoss):
 
         self.drive_cooldown = 0
 
-        self.set_arena(
-            3,
-            1,
-            16,
-            9,
-        )
+        self.set_arena(3, 1, 16, 9)
 
         self.skill_manager.add_skill(
             DashSkill(
@@ -61,12 +56,12 @@ class WhiteTanto(LargeBoss):
         self.update_drive_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.attack_player(
-                player,
-                self.attack,
-                45,
-            )
+        if self.handle_melee_attack(
+            player,
+            self.attack,
+            cooldown=45,
+            warning_time=34,
+        ):
             return
 
         self.drive_move(game_map, player)
@@ -78,10 +73,8 @@ class WhiteTanto(LargeBoss):
     def get_drive_cooldown(self):
         if self.phase == 1:
             return 20
-
         if self.phase == 2:
             return 15
-
         return 10
 
     def drive_move(self, game_map, player):
@@ -108,12 +101,8 @@ class WhiteTanto(LargeBoss):
         self.drive_cooldown = self.get_drive_cooldown()
 
     def draw(self, screen, camera_x=0, camera_y=0):
-        self.skill_manager.draw(
-            screen,
-            self,
-            camera_x,
-            camera_y,
-        )
+        self.skill_manager.draw(screen, self, camera_x, camera_y)
+        self.draw_melee_warning(screen, camera_x, camera_y)
 
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
@@ -127,18 +116,9 @@ class WhiteTanto(LargeBoss):
         else:
             pygame.draw.rect(screen, (230, 230, 230), rect)
 
-        if self.phase == 2:
-            pygame.draw.rect(
-                screen,
-                (255, 230, 120),
-                rect,
-                2,
-            )
+        self.draw_body_warning(screen, rect)
 
+        if self.phase == 2:
+            pygame.draw.rect(screen, (255, 230, 120), rect, 2)
         elif self.phase == 3:
-            pygame.draw.rect(
-                screen,
-                (255, 120, 120),
-                rect,
-                3,
-            )
+            pygame.draw.rect(screen, (255, 120, 120), rect, 3)

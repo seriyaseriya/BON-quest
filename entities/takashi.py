@@ -60,12 +60,12 @@ class Takashi(LargeBoss):
         self.update_takashi_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.attack_player(
-                player,
-                self.attack,
-                45,
-            )
+        if self.handle_melee_attack(
+            player,
+            self.attack,
+            cooldown=45,
+            warning_time=34,
+        ):
             return
 
         self.walk_toward_player(game_map, player)
@@ -114,6 +114,12 @@ class Takashi(LargeBoss):
             camera_y,
         )
 
+        self.draw_melee_warning(
+            screen,
+            camera_x,
+            camera_y,
+        )
+
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
             self.y * TILE_SIZE - camera_y,
@@ -125,6 +131,8 @@ class Takashi(LargeBoss):
             screen.blit(Takashi.image, rect)
         else:
             pygame.draw.rect(screen, (30, 30, 30), rect)
+
+        self.draw_body_warning(screen, rect)
 
         if self.phase == 2:
             pygame.draw.rect(

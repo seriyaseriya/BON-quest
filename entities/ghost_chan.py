@@ -62,8 +62,7 @@ class GhostChan(LargeBoss):
         self.update_ghost_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.touch_attack(player)
+        if self.handle_touch_attack(player):
             self.escape_from_player(game_map, player)
             return
 
@@ -76,9 +75,12 @@ class GhostChan(LargeBoss):
         if self.touch_cooldown > 0:
             self.touch_cooldown -= 1
 
-    def touch_attack(self, player):
+    def handle_touch_attack(self, player):
         if self.touch_cooldown > 0:
-            return
+            return False
+
+        if not self.is_next_to_player(player):
+            return False
 
         damage = self.attack
 
@@ -88,8 +90,17 @@ class GhostChan(LargeBoss):
         if self.phase >= 3:
             damage += 2
 
-        self.damage_player(player, damage)
-        self.touch_cooldown = 55
+        handled = self.handle_melee_attack(
+            player,
+            damage,
+            cooldown=55,
+            warning_time=34,
+        )
+
+        if handled and self.melee_warning_timer == 0:
+            self.touch_cooldown = 55
+
+        return handled
 
     def float_move(self, game_map, player):
         if self.float_cooldown > 0:
@@ -171,6 +182,12 @@ class GhostChan(LargeBoss):
             camera_y,
         )
 
+        self.draw_melee_warning(
+            screen,
+            camera_x,
+            camera_y,
+        )
+
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
             self.y * TILE_SIZE - camera_y,
@@ -182,6 +199,8 @@ class GhostChan(LargeBoss):
             screen.blit(GhostChan.image, rect)
         else:
             pygame.draw.rect(screen, (210, 220, 255), rect)
+
+        self.draw_body_warning(screen, rect)
 
         if self.phase == 2:
             pygame.draw.rect(

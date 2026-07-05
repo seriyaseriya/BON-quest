@@ -17,6 +17,7 @@ class Projectile:
         owner="player",
         bounce=False,
         pierce=False,
+        freeze_duration=0,
     ):
         self.x = float(x)
         self.y = float(y)
@@ -31,6 +32,7 @@ class Projectile:
 
         self.bounce = bounce
         self.pierce = pierce
+        self.freeze_duration = freeze_duration
 
         self.alive = True
 

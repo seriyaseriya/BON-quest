@@ -4,6 +4,8 @@ from settings import *
 from scenes.title_scene import TitleScene
 from scenes.play_scene import PlayScene
 
+from managers.save_manager import SaveManager
+
 
 class Game:
     def __init__(self):
@@ -21,6 +23,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
+        self.save_manager = SaveManager()
+
         self.title_scene = TitleScene(self)
         self.play_scene = PlayScene(self)
 
@@ -32,6 +36,7 @@ class Game:
 
     def change_scene(self, scene_name):
         if scene_name == "title":
+            self.title_scene.reset_scene()
             self.current_scene = self.title_scene
 
         elif scene_name == "play":
@@ -44,6 +49,13 @@ class Game:
 
             elif event.type == pygame.KEYDOWN:
                 self.current_scene.handle_keydown(event.key)
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if hasattr(self.current_scene, "handle_mouse_button_down"):
+                    self.current_scene.handle_mouse_button_down(
+                        event.button,
+                        event.pos,
+                    )
 
     def update(self):
         self.current_scene.update()

@@ -20,16 +20,11 @@ class KingRat(LargeBoss):
         self.attack = 5
         self.defense = 1
 
-        self.set_arena(
-            3,
-            1,
-            16,
-            9,
-        )
+        self.set_arena(3, 1, 16, 9)
 
         self.skill_manager.add_skill(
             ChargeSkill(
-                cooldown=80,
+                cooldown=90,
                 steps=5,
                 move_interval=8,
                 min_phase=2,
@@ -59,12 +54,12 @@ class KingRat(LargeBoss):
         self.update_common_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.attack_player(
-                player,
-                self.attack,
-                45,
-            )
+        if self.handle_melee_attack(
+            player,
+            self.attack,
+            cooldown=55,
+            warning_time=34,
+        ):
             return
 
         self.chase_player(
@@ -83,17 +78,32 @@ class KingRat(LargeBoss):
         return 12
 
     def draw(self, screen, camera_x=0, camera_y=0):
+        self.skill_manager.draw(
+            screen,
+            self,
+            camera_x,
+            camera_y,
+        )
+
+        self.draw_melee_warning(
+            screen,
+            camera_x,
+            camera_y,
+        )
+
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
             self.y * TILE_SIZE - camera_y,
             TILE_SIZE * self.width,
-            TILE_SIZE * self.height
+            TILE_SIZE * self.height,
         )
 
         if KingRat.image is not None:
             screen.blit(KingRat.image, rect)
         else:
             pygame.draw.rect(screen, (190, 70, 70), rect)
+
+        self.draw_body_warning(screen, rect)
 
         if self.phase == 2:
             pygame.draw.rect(

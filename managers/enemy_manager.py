@@ -23,12 +23,82 @@ class EnemyManager:
 
         return targets
 
-    def update(self, player, game_map):
+    def update(self, player, game_map, projectile_manager=None):
         for enemy in self.enemies:
-            enemy.update(player, game_map)
+            if enemy.hp <= 0:
+                continue
+
+            blocked_positions = self.get_blocked_positions(enemy)
+
+            old_x = enemy.x
+            old_y = enemy.y
+
+            self.update_enemy(
+                enemy,
+                player,
+                game_map,
+                blocked_positions,
+                projectile_manager,
+            )
+
+            if self.is_enemy_overlapping(enemy):
+                enemy.x = old_x
+                enemy.y = old_y
 
         if self.boss is not None and not self.boss.is_dead():
             self.boss.update(game_map, player)
+
+    def update_enemy(
+        self,
+        enemy,
+        player,
+        game_map,
+        blocked_positions,
+        projectile_manager,
+    ):
+        try:
+            enemy.update(
+                player,
+                game_map,
+                blocked_positions,
+                projectile_manager,
+            )
+        except TypeError:
+            enemy.update(
+                player,
+                game_map,
+                blocked_positions,
+            )
+
+    def get_blocked_positions(self, current_enemy):
+        positions = set()
+
+        for enemy in self.enemies:
+            if enemy is current_enemy:
+                continue
+
+            if enemy.hp <= 0:
+                continue
+
+            positions.add((enemy.x, enemy.y))
+
+        return positions
+
+    def is_enemy_overlapping(self, target_enemy):
+        if target_enemy.hp <= 0:
+            return False
+
+        for enemy in self.enemies:
+            if enemy is target_enemy:
+                continue
+
+            if enemy.hp <= 0:
+                continue
+
+            if enemy.x == target_enemy.x and enemy.y == target_enemy.y:
+                return True
+
+        return False
 
     def draw(self, screen):
         for enemy in self.enemies:

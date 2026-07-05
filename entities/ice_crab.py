@@ -73,8 +73,7 @@ class IceCrab(LargeBoss):
         self.update_ice_crab_timers()
         self.update_skills(game_map, player)
 
-        if self.is_next_to_player(player):
-            self.claw_attack(player)
+        if self.handle_claw_attack(player):
             return
 
         self.side_walk(game_map, player)
@@ -95,14 +94,9 @@ class IceCrab(LargeBoss):
 
         return 13
 
-    def claw_attack(self, player):
-        if self.claw_cooldown > 0:
-            self.attack_player(
-                player,
-                self.attack,
-                50,
-            )
-            return
+    def handle_claw_attack(self, player):
+        if not self.is_next_to_player(player):
+            return False
 
         damage = self.attack + 2
 
@@ -112,10 +106,25 @@ class IceCrab(LargeBoss):
         if self.phase >= 3:
             damage += 2
 
-        self.damage_player(player, damage)
+        if self.claw_cooldown > 0:
+            return self.handle_melee_attack(
+                player,
+                self.attack,
+                cooldown=50,
+                warning_time=34,
+            )
 
-        self.claw_cooldown = 80
-        self.attack_cooldown = 45
+        handled = self.handle_melee_attack(
+            player,
+            damage,
+            cooldown=45,
+            warning_time=18,
+        )
+
+        if handled and self.melee_warning_timer == 0:
+            self.claw_cooldown = 80
+
+        return handled
 
     def side_walk(self, game_map, player):
         if self.move_cooldown > 0:
@@ -153,6 +162,12 @@ class IceCrab(LargeBoss):
             camera_y,
         )
 
+        self.draw_melee_warning(
+            screen,
+            camera_x,
+            camera_y,
+        )
+
         rect = pygame.Rect(
             self.x * TILE_SIZE - camera_x,
             self.y * TILE_SIZE - camera_y,
@@ -164,6 +179,8 @@ class IceCrab(LargeBoss):
             screen.blit(IceCrab.image, rect)
         else:
             pygame.draw.rect(screen, (80, 190, 230), rect)
+
+        self.draw_body_warning(screen, rect)
 
         if self.phase == 2:
             pygame.draw.rect(
