@@ -35,6 +35,17 @@ from managers.particle_manager import ParticleManager
 
 from ui.bonus_choice_ui import BonusChoiceUI
 from managers.run_stats_manager import RunStatsManager
+from ui.pause_menu import PauseMenu
+from ui.achievement_screen import AchievementScreen
+from ui.achievement_popup import AchievementPopup
+from ui.boss_intro import BossIntro
+from data.boss_intro_data import get_boss_intro_data
+from systems.run_timer import RunTimer
+from systems.camera_effect_system import CameraEffectSystem
+from systems.skill_effect_system import SkillEffectSystem
+from systems.attack_indicator_system import AttackIndicatorSystem
+from effects.barrier_effect import BarrierEffect
+from managers.online_ranking_client import OnlineRankingClient
 
 from dungeon.game_map import (
     game_map,
@@ -46,6 +57,7 @@ from dungeon.game_map import (
     get_boss_treasure_position,
     open_boss_gate,
     spawn_boss_stairs,
+    close_boss_gate,
 )
 
 
@@ -66,6 +78,8 @@ class PlayScene:
         self.shadow_system = ShadowSystem()
         self.bonus_floor_system = BonusFloorSystem()
         self.shop_system = ShopSystem()
+        self.attack_indicator_system = AttackIndicatorSystem()
+        self.camera_effect_system = CameraEffectSystem()
 
         self.enemy_manager = EnemyManager()
         self.effect_manager = EffectManager()
@@ -78,9 +92,18 @@ class PlayScene:
 
         self.bonus_choice_ui = BonusChoiceUI()
         self.shop_ui = ShopUI()
+        self.pause_menu = PauseMenu()
+        self.achievement_screen = AchievementScreen()
+        self.achievement_popup = AchievementPopup()
+        self.barrier_effect = BarrierEffect()
 
         self.pending_bonus_level_ups = 0
         self.show_shop = False
+        self.run_timer = RunTimer()
+        self.skill_effect_system = SkillEffectSystem(
+            self.particle_manager,
+            self.camera_effect_system,
+        )
 
         self.reset()
 
@@ -97,7 +120,20 @@ class PlayScene:
         self.ability_manager = AbilityManager()
         self.projectile_manager = ProjectileManager()
 
+        self.skill_effect_system = SkillEffectSystem(
+            self.particle_manager,
+            self.camera_effect_system,
+        )
+
         self.apply_permanent_upgrades()
+
+        # ==============================
+        # テスト用：アビリティ付与
+        # ==============================
+        ##self.ability_manager.add_or_level_up("soccer_ball")
+        ##self.ability_manager.add_or_level_up("mouse_bomb")
+        ##self.ability_manager.add_or_level_up("purr")
+        ##self.ability_manager.add_or_level_up("barrier")
 
         self.items = []
         self.chests = []
@@ -113,10 +149,28 @@ class PlayScene:
         self.show_shop = False
         self.equipment_selected_index = 0
 
+        self.pause_menu.reset()
+
         self.run_stats_manager.reset()
         self.run_result_saved = False
 
+        self.achievement_screen.close()
+
         self.setup_floor()
+        self.achievement_popup = AchievementPopup()
+
+        self.boss_intro = BossIntro()
+        self.boss_battle_started = False
+        self.boss_intro_played = False
+        self.final_boss_defeated = False
+        self.boss_defeat_handled = False
+
+        self.ending_transition_timer = 0
+        self.run_timer.start()
+
+        self.final_clear_time = None
+        self.final_clear_time_text = ""
+        self.final_clear_new_record = False
 
     def apply_permanent_upgrades(self):
         save_manager = self.game.save_manager
@@ -265,6 +319,8 @@ class PlayScene:
 
         self.player.revive_used = True
 
+        self.run_stats_manager.record_revive_used()
+
         revive_hp = max(
             1,
             self.player.max_hp // 2,
@@ -275,6 +331,8 @@ class PlayScene:
         self.set_message(
             "ねこの根性！ミルクは立ち上がった！"
         )
+
+        self.check_realtime_achievements()
 
         return True
 
@@ -313,6 +371,7 @@ class PlayScene:
         self.projectile_manager.clear()
         self.decoration_system.clear()
         self.particle_manager.clear()
+        self.attack_indicator_system.clear()
 
         if self.floor_system.is_bonus_floor():
             self.bonus_floor_system.start()
@@ -339,6 +398,11 @@ class PlayScene:
                 self.floor_system.floor,
             )
 
+            self.boss_battle_started = False
+            self.boss_intro_played = False
+            self.boss_defeat_handled = False
+            self.boss_intro.reset()
+
         else:
             self.items = self.spawn_system.create_items(
                 self.player,
@@ -364,6 +428,8 @@ class PlayScene:
         self.run_stats_manager.update_floor(
             self.floor_system.floor
         )
+
+        self.check_realtime_achievements()
 
     def create_random_chests(self):
         chest_kinds = []
@@ -473,15 +539,61 @@ class PlayScene:
         self.state.open_level_up()
 
     def handle_keydown(self, key):
-        if self.state.game_over:
-            if key == pygame.K_r:
-                self.reset()
-                return
+        if self.achievement_screen.active:
+            self.achievement_screen.handle_keydown(
+                key,
+                self.game.achievement_manager,
+            )
+            return
 
+        if self.state.game_over:
             if key == pygame.K_t or key == pygame.K_ESCAPE:
                 self.game.change_scene("title")
                 return
 
+            return
+
+        if self.pause_menu.active:
+            action = self.pause_menu.handle_keydown(key)
+
+            if action == "retire_confirmed":
+                self.pause_menu.close()
+                self.run_stats_manager.set_retired()
+                self.finalize_run()
+                self.state.set_game_over()
+                return
+
+            if action == "resume":
+                return
+
+            if action == "achievements":
+                self.achievement_screen.open()
+                return
+
+            if action == "controls":
+                self.set_message("操作方法画面は次に実装するにゃ！")
+                return
+
+            if action == "retire":
+                self.set_message("リタイア確認は次に実装するにゃ！")
+                return
+
+            if action == "title":
+                self.game.change_scene("title")
+                return
+
+            return
+
+        if key == pygame.K_ESCAPE:
+            if self.show_shop:
+                self.handle_shop(key)
+                return
+
+            if self.state.show_equipment:
+                self.handle_equipment(key)
+                return
+
+            self.pause_menu.open()
             return
 
         if key == pygame.K_r:
@@ -500,26 +612,6 @@ class PlayScene:
 
         if self.bonus_floor_system.is_active():
             self.handle_bonus_floor_key(key)
-            return
-
-        if key == pygame.K_7:
-            self.floor_system.floor = 16
-            self.next_floor()
-            return
-
-        if key == pygame.K_8:
-            self.floor_system.floor = 21
-            self.next_floor()
-            return
-
-        if key == pygame.K_9:
-            self.floor_system.floor = 28
-            self.next_floor()
-            return
-
-        if key == pygame.K_0:
-            self.floor_system.floor = 30
-            self.setup_floor()
             return
 
         if self.state.show_reward_choices:
@@ -614,6 +706,10 @@ class PlayScene:
             return
 
         if self.state.game_over:
+            return
+        
+        if self.is_boss_locked():
+            self.set_message("まだ攻撃できないにゃ……！")
             return
 
         self.combat_system.handle_player_attack(
@@ -753,6 +849,10 @@ class PlayScene:
         )
 
         if result["opened"]:
+            # 宝箱を開けた実績を記録
+            self.run_stats_manager.record_chest_opened()
+            self.check_realtime_achievements()
+
             self.set_message(
                 result["message"],
             )
@@ -806,6 +906,9 @@ class PlayScene:
         self.state.close_reward()
 
     def handle_target_defeated(self, defeated_target):
+        if self.is_boss_locked():
+            return
+
         if defeated_target == self.enemy_manager.boss:
             self.handle_boss_defeated()
         else:
@@ -851,16 +954,76 @@ class PlayScene:
         if leveled:
             self.start_level_up()
 
+        enemy_class_name = defeated_enemy.__class__.__name__
+
+        if enemy_class_name == "MetalGlassesEnemy":
+            self.run_stats_manager.record_metal_glasses_defeated()
+
+        self.check_realtime_achievements()
+
     def handle_boss_defeated(self):
+        if self.boss_defeat_handled:
+            return
+
+        boss = self.enemy_manager.boss
+
+        if boss is None:
+            return
+
+        self.boss_defeat_handled = True
+
         self.run_stats_manager.record_boss_defeated()
-        
-        if self.enemy_manager.boss is not None:
-            self.particle_manager.spawn_enemy_defeat(
-                self.enemy_manager.boss.x,
-                self.enemy_manager.boss.y,
+
+        self.particle_manager.spawn_enemy_defeat(
+            boss.x,
+            boss.y,
+        )
+
+        # ==============================
+        # 最終ボス
+        # ==============================
+
+        if boss.__class__.__name__ == "Takashi":
+            clear_time = self.run_timer.finish()
+
+            is_new_record = self.game.save_manager.record_clear(
+                clear_time
             )
 
-        self.set_message("KING RAT defeated!")
+            self.run_stats_manager.set_cleared()
+
+            self.final_clear_time = clear_time
+            self.final_clear_time_text = self.run_timer.format_time(
+                clear_time
+            )
+            self.final_clear_new_record = is_new_record
+
+            self.final_boss_defeated = True
+            self.ending_transition_timer = 120
+
+            self.set_message(
+                "……長い冒険が、終わろうとしている。"
+            )
+
+            if is_new_record:
+                self.set_message(
+                    f"新記録にゃ！ クリアタイム {self.final_clear_time_text}"
+                )
+            else:
+                self.set_message(
+                    f"クリアタイム {self.final_clear_time_text}"
+                )
+
+            self.check_realtime_achievements()
+            return
+
+        # ==============================
+        # 通常ボス
+        # ==============================
+
+        self.set_message(
+            f"{self.get_boss_display_name()} defeated!"
+        )
 
         leveled = self.player.gain_exp(5)
 
@@ -871,6 +1034,7 @@ class PlayScene:
         spawn_boss_stairs()
 
         chest_x, chest_y = get_boss_treasure_position()
+
         self.chests.append(
             Chest(
                 chest_x,
@@ -879,7 +1043,30 @@ class PlayScene:
             )
         )
 
+        self.check_realtime_achievements()
+
     def update(self):
+        self.achievement_popup.update()
+        self.attack_indicator_system.update()
+        self.camera_effect_system.update()
+        self.barrier_effect.update()
+
+        if self.achievement_screen.active:
+            self.achievement_screen.update()
+            return
+        
+
+        if self.achievement_screen.active:
+            self.achievement_screen.update()
+            return
+
+        if self.pause_menu.active:
+            self.run_timer.pause()
+            self.pause_menu.update()
+            return
+        else:
+            self.run_timer.resume()
+
         for npc in self.npcs:
             npc.update()
 
@@ -892,6 +1079,18 @@ class PlayScene:
 
         if self.state.game_over:
             return
+        
+        if self.final_boss_defeated:
+            self.ending_transition_timer -= 1
+
+            self.particle_manager.update()
+            self.effect_manager.update()
+            self.state.update_message()
+
+            if self.ending_transition_timer <= 0:
+                self.game.change_scene("ending")
+
+            return
 
         if self.show_shop:
             self.state.update_message()
@@ -903,6 +1102,26 @@ class PlayScene:
         if self.floor_intro_timer > 0:
             self.floor_intro_timer -= 1
 
+        self.update_boss_intro_trigger()
+
+        if self.boss_intro.is_active():
+            self.boss_intro.update()
+
+            if not self.boss_intro.is_active():
+                self.boss_battle_started = True
+                self.set_message("ボス戦開始にゃ！")
+
+            return
+        
+        if self.floor_system.is_boss_floor() and not self.boss_battle_started:
+            self.floor_transition_system.update_boss_gate(
+                self.player,
+                self.enemy_manager,
+            )
+
+            self.state.update_message()
+            return
+
         self.player.update()
 
         self.enemy_manager.update(
@@ -912,7 +1131,17 @@ class PlayScene:
         )
 
         self.particle_manager.update()
+        self.projectile_manager.particle_manager = self.particle_manager
+        self.projectile_manager.camera_effect_system = self.camera_effect_system
+        self.projectile_manager.attack_indicator_system = self.attack_indicator_system
+        self.projectile_manager.effect_manager = self.effect_manager
 
+        self.barrier_effect.update()
+        self.barrier_effect.spawn_particles(
+            self.player,
+            self.particle_manager,
+        )
+        
         self.ability_manager.update(
             self.player,
             self.projectile_manager,
@@ -926,6 +1155,8 @@ class PlayScene:
             self.handle_target_defeated,
             self.handle_enemy_hit,
             player=self.player,
+            particle_manager=self.particle_manager,
+            camera_effect_system=self.camera_effect_system,
         )
 
         self.effect_manager.update()
@@ -1030,19 +1261,33 @@ class PlayScene:
 
         self.player.draw(world_surface)
 
+        self.barrier_effect.draw(
+            world_surface,
+            self.player,
+        )
+        
+        self.attack_indicator_system.draw(world_surface)
+
         self.effect_manager.draw(world_surface)
 
         self.particle_manager.draw(world_surface)
 
         camera_x, camera_y = self.get_camera_offset()
+        shake_x, shake_y = self.camera_effect_system.get_shake_offset()
 
         self.screen.blit(
             world_surface,
             (
-                -camera_x,
-                -camera_y,
+                -camera_x + shake_x,
+                -camera_y + shake_y,
             ),
         )
+
+        if self.player.shield_hp > 0:
+            self.barrier_effect.draw(
+                world_surface,
+                self.player,
+            )
 
     def draw_ui(self):
         self.ui_manager.draw(
@@ -1090,9 +1335,32 @@ class PlayScene:
         self.draw_world()
         self.draw_ui()
 
+        self.pause_menu.draw(self.screen)
+
+        self.boss_intro.draw(self.screen)
+
+        self.achievement_screen.draw(
+            self.screen,
+            self.game.achievement_manager,
+        )
+
+        self.achievement_popup.draw(self.screen)
+        self.camera_effect_system.draw_flash(self.screen)
+
     def handle_enemy_hit(self, enemy, damage):
         self.particle_manager.spawn_hit(enemy.x, enemy.y)
         self.particle_manager.spawn_slash(enemy.x, enemy.y)
+
+        self.effect_manager.add_attack_effect(
+            enemy.x,
+            enemy.y,
+            damage,
+        )
+
+        self.camera_effect_system.shake(
+            power=3,
+            duration=6,
+        )
 
     def start_bonus_level_up_chain(self, count):
         if count <= 0:
@@ -1132,6 +1400,104 @@ class PlayScene:
             self.run_stats_manager
         )
 
+        clear_time = None
+
+        if getattr(self.run_stats_manager, "cleared", False):
+            clear_time = self.game.save_manager.get_last_clear_time()
+
+        ranking_client = OnlineRankingClient(ONLINE_RANKING_URL)
+
+        ranking_client.submit_score(
+            self.game.save_manager.get_player_name(),
+            self.run_stats_manager.max_floor_reached,
+            clear_time,
+        )
+
+        self.game.achievement_manager.reset_newly_unlocked()
+
+        self.game.achievement_manager.check_run_stats(
+            self.run_stats_manager
+        )
+
+        self.game.achievement_manager.check_save_data()
+
+        for achievement in self.game.achievement_manager.newly_unlocked:
+            self.achievement_popup.add(achievement)
+
         self.run_result_saved = True
 
         return earned_points
+
+    def check_realtime_achievements(self):
+        self.game.achievement_manager.reset_newly_unlocked()
+
+        self.game.achievement_manager.check_run_stats(
+            self.run_stats_manager
+        )
+
+        for achievement in self.game.achievement_manager.newly_unlocked:
+            self.achievement_popup.add(achievement)
+
+    def is_boss_locked(self):
+        if not self.floor_system.is_boss_floor():
+            return False
+
+        if self.boss_battle_started:
+            return False
+
+        if self.enemy_manager.boss is None:
+            return False
+
+        return True
+
+    def is_player_in_boss_room(self):
+        boss = self.enemy_manager.boss
+
+        if boss is None:
+            return False
+
+        dx = abs(self.player.x - boss.x)
+        dy = abs(self.player.y - boss.y)
+
+        return dx <= 8 and dy <= 6
+
+
+    def get_boss_display_name(self):
+        boss = self.enemy_manager.boss
+
+        if boss is None:
+            return "UNKNOWN BOSS"
+
+        if hasattr(boss, "name"):
+            return boss.name
+
+        return boss.__class__.__name__
+
+
+    def update_boss_intro_trigger(self):
+        if not self.floor_system.is_boss_floor():
+            return
+
+        if self.boss_battle_started:
+            return
+
+        if self.boss_intro_played:
+            return
+
+        if self.is_player_in_boss_room():
+            self.boss_intro_played = True
+
+            # ボス部屋に入った瞬間に入口を閉じる
+            close_boss_gate()
+
+            self.set_message("入口が閉ざされたにゃ……！")
+
+            intro_data = get_boss_intro_data(
+                self.enemy_manager.boss
+            )
+
+            self.boss_intro.start(
+                intro_data.get("name", self.get_boss_display_name()),
+                intro_data.get("title", "BOSS BATTLE START"),
+                intro_data,
+            )

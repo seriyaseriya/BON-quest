@@ -23,6 +23,8 @@ class BaseAbility:
         if level <= 0:
             return
 
+        level = player.ability_manager.get_level(self.ability_id)
+
         used = self.use(
             player,
             projectile_manager,

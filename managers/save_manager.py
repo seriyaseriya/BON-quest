@@ -12,6 +12,13 @@ class SaveManager:
         "total_bosses_defeated": 0,
         "total_coins_earned": 0,
         "highest_floor": 1,
+        "player_name": "MILK",
+
+        # クリア記録
+        "total_clears": 0,
+        "best_clear_time": None,
+        "last_clear_time": None,
+
         "upgrades": {},
         "achievements": {},
     }
@@ -127,3 +134,68 @@ class SaveManager:
         self.save()
 
         return True
+    
+    def record_clear(self, clear_time):
+        if clear_time is None:
+            return False
+
+        if clear_time <= 0:
+            return False
+
+        clear_time = round(
+            float(clear_time),
+            3,
+        )
+
+        self.data["total_clears"] += 1
+        self.data["last_clear_time"] = clear_time
+
+        best_time = self.data.get(
+            "best_clear_time"
+        )
+
+        is_new_record = (
+            best_time is None
+            or clear_time < best_time
+        )
+
+        if is_new_record:
+            self.data["best_clear_time"] = clear_time
+
+        self.save()
+
+        return is_new_record
+
+
+    def get_best_clear_time(self):
+        return self.data.get(
+            "best_clear_time"
+        )
+
+
+    def get_last_clear_time(self):
+        return self.data.get(
+            "last_clear_time"
+        )
+
+
+    def get_total_clears(self):
+        return self.data.get(
+            "total_clears",
+            0,
+        )
+    
+    def get_player_name(self):
+        return self.data.get("player_name", "MILK")
+
+
+    def set_player_name(self, name):
+        name = str(name).strip()
+
+        if name == "":
+            name = "MILK"
+
+        name = name[:12]
+
+        self.data["player_name"] = name
+        self.save()

@@ -5,6 +5,11 @@ from scenes.title_scene import TitleScene
 from scenes.play_scene import PlayScene
 
 from managers.save_manager import SaveManager
+from managers.achievement_manager import AchievementManager
+from scenes.opening_scene import OpeningScene
+from scenes.ending_scene import EndingScene
+from scenes.credits_scene import CreditsScene
+from scenes.clear_result_scene import ClearResultScene
 
 
 class Game:
@@ -24,9 +29,14 @@ class Game:
         self.running = True
 
         self.save_manager = SaveManager()
+        self.achievement_manager = AchievementManager(self.save_manager)
 
         self.title_scene = TitleScene(self)
+        self.opening_scene = OpeningScene(self)
         self.play_scene = PlayScene(self)
+        self.ending_scene = EndingScene(self)
+        self.credits_scene = CreditsScene(self)
+        self.clear_result_scene = ClearResultScene(self)
 
         self.current_scene = self.title_scene
 
@@ -39,8 +49,24 @@ class Game:
             self.title_scene.reset_scene()
             self.current_scene = self.title_scene
 
+        elif scene_name == "opening":
+            self.opening_scene.reset()
+            self.current_scene = self.opening_scene
+
         elif scene_name == "play":
             self.start_game()
+
+        elif scene_name == "ending":
+            self.ending_scene.reset()
+            self.current_scene = self.ending_scene
+
+        elif scene_name == "credits":
+            self.credits_scene.reset()
+            self.current_scene = self.credits_scene
+
+        elif scene_name == "clear_result":
+            self.clear_result_scene.reset()
+            self.current_scene = self.clear_result_scene
 
     def handle_events(self):
         for event in pygame.event.get():

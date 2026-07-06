@@ -13,6 +13,7 @@ class ScratchAbility(BaseAbility):
         level,
         on_enemy_defeated=None,
     ):
+
         if not enemies:
             return False
 
@@ -53,6 +54,25 @@ class ScratchAbility(BaseAbility):
 
         for _, enemy in targets[:target_count]:
             result = enemy.take_damage(damage)
+
+            if hasattr(projectile_manager, "effect_manager"):
+                projectile_manager.effect_manager.add_attack_effect(
+                    enemy.x,
+                    enemy.y,
+                    damage,
+                )
+
+            # ひっかき専用の派手な演出
+            if hasattr(projectile_manager, "particle_manager"):
+                projectile_manager.particle_manager.spawn_slash(enemy.x, enemy.y)
+                projectile_manager.particle_manager.spawn_slash(enemy.x, enemy.y)
+                projectile_manager.particle_manager.spawn_hit(enemy.x, enemy.y)
+
+            if hasattr(projectile_manager, "camera_effect_system"):
+                projectile_manager.camera_effect_system.shake(
+                    power=3,
+                    duration=5,
+                )
 
             if result == "enemy_defeated" and on_enemy_defeated is not None:
                 on_enemy_defeated(enemy)

@@ -27,6 +27,8 @@ class LargeBoss(Boss):
         self.arena_right = 999
         self.arena_bottom = 999
 
+        self.freeze_timer = 0
+
     def set_arena(self, left, top, right, bottom):
         self.arena_left = left
         self.arena_top = top
@@ -179,6 +181,10 @@ class LargeBoss(Boss):
         self.move_cooldown = cooldown
 
     def update_common_timers(self):
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
+            return
+
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
 

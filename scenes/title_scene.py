@@ -5,6 +5,8 @@ import pygame
 from settings import *
 from ui.font_manager import get_hud_font
 from ui.title_upgrade_screen import TitleUpgradeScreen
+from ui.achievement_screen import AchievementScreen
+from ui.ranking_screen import RankingScreen
 
 
 class TitleScene:
@@ -77,6 +79,8 @@ class TitleScene:
             self.screen,
         )
 
+        self.achievement_screen = AchievementScreen()
+
         # ==================================================
         # メニュー
         # ==================================================
@@ -85,7 +89,7 @@ class TitleScene:
             "START",
             "UPGRADE",
             "ACHIEVEMENTS",
-            "SETTINGS",
+            "RANKING",
             "CREDITS",
             "EXIT",
         ]
@@ -126,6 +130,8 @@ class TitleScene:
         self.upgrade_selected_index = 0
         self.upgrade_scroll = 0
         self.upgrades_per_page = 5
+
+        self.ranking_screen = RankingScreen()
 
     # ==================================================
     # 共通
@@ -218,6 +224,30 @@ class TitleScene:
                 self.mode = "menu"
 
             return
+        
+        if self.mode == "achievements":
+            result = self.achievement_screen.handle_keydown(
+                key,
+                self.game.achievement_manager,
+            )
+
+            if result == "close":
+                self.mode = "menu"
+
+            return
+
+        if self.mode == "ranking":
+            result = self.ranking_screen.handle_keydown(key)
+
+            if result == "close":
+                self.mode = "menu"
+
+            if result == "save_name":
+                self.game.save_manager.set_player_name(
+                    self.ranking_screen.name_input
+                )
+
+            return
 
         if key in (
             pygame.K_UP,
@@ -262,7 +292,7 @@ class TitleScene:
         ]
 
         if selected == "START":
-            self.start_fade_out("play")
+            self.start_fade_out("opening")
 
         elif selected == "UPGRADE":
             self.mode = "upgrade"
@@ -270,6 +300,8 @@ class TitleScene:
             return
 
         elif selected == "ACHIEVEMENTS":
+            self.mode = "achievements"
+            self.achievement_screen.open()
             return
 
         elif selected == "SETTINGS":
@@ -281,6 +313,11 @@ class TitleScene:
         elif selected == "EXIT":
             self.game.running = False
 
+        elif selected == "RANKING":
+            self.mode = "ranking"
+            self.ranking_screen.open()
+            return
+
     # ==================================================
     # シーンリセット
     # ==================================================
@@ -290,12 +327,16 @@ class TitleScene:
 
         self.mode = "menu"
 
+        self.achievement_screen.close()
+
         self.upgrade_selected_index = 0
         self.upgrade_scroll = 0
 
         self.fade_alpha = 255
         self.fading_out = False
         self.next_scene = None
+
+        self.ranking_screen.close()
 
     # ==================================================
     # フェード
@@ -307,6 +348,12 @@ class TitleScene:
 
     def update(self):
         self.timer += 1
+
+        if self.mode == "achievements":
+            self.achievement_screen.update()
+
+        if self.mode == "ranking":
+            self.ranking_screen.update()
 
         if self.fading_out:
             self.fade_alpha += self.fade_speed
@@ -325,6 +372,9 @@ class TitleScene:
     def change_scene(self):
         if self.next_scene == "play":
             self.game.change_scene("play")
+
+        elif self.next_scene == "opening":
+            self.game.change_scene("opening")
 
     # ==================================================
     # 描画
@@ -345,7 +395,19 @@ class TitleScene:
         if self.mode == "upgrade":
             self.upgrade_screen.draw(self.timer)
 
+        if self.mode == "achievements":
+            self.achievement_screen.draw(
+                self.screen,
+                self.game.achievement_manager,
+            )
+
         self.draw_fade()
+
+        if self.mode == "ranking":
+            self.ranking_screen.draw(
+                self.screen,
+                self.game.save_manager,
+            )
 
     # ==================================================
     # 背景暗転

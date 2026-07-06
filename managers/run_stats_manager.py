@@ -9,6 +9,18 @@ class RunStatsManager:
         self.max_floor_reached = 1
         self.retired = False
         self.cleared = False
+        self.chests_opened = 0
+        self.metal_glasses_defeated = 0
+        self.revive_used = False
+
+    def record_chest_opened(self):
+        self.chests_opened += 1
+
+    def record_metal_glasses_defeated(self):
+        self.metal_glasses_defeated += 1
+
+    def record_revive_used(self):
+        self.revive_used = True
 
     def record_enemy_defeated(self):
         self.enemies_defeated += 1

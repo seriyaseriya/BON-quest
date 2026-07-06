@@ -15,6 +15,7 @@ class SoccerBallAbility(BaseAbility):
         level,
         on_enemy_defeated=None,
     ):
+
         speed = 5 + level * 0.5
         damage = 2 + level
         duration = 120 + level * 10
@@ -41,19 +42,22 @@ class SoccerBallAbility(BaseAbility):
             vx = dx / length * speed
             vy = dy / length * speed
 
-            projectile_manager.spawn(
+            projectile = projectile_manager.spawn(
                 x=player.x * TILE_SIZE + TILE_SIZE // 2,
                 y=player.y * TILE_SIZE + TILE_SIZE // 2,
                 vx=vx,
                 vy=vy,
-                radius=7,
+                radius=8,
                 damage=damage,
                 duration=duration,
-                color=(240, 240, 240),
+                color=(255, 255, 255),
                 owner="player",
                 bounce=True,
                 pierce=False,
             )
+
+            projectile.effect_type = "soccer_ball"
+            projectile.max_trail = 12
 
         return True
 

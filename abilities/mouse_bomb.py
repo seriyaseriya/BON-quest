@@ -15,6 +15,7 @@ class MouseBombAbility(BaseAbility):
         level,
         on_enemy_defeated=None,
     ):
+
         target = self.find_nearest_enemy(player, enemies)
 
         if target is None:
@@ -41,19 +42,24 @@ class MouseBombAbility(BaseAbility):
         vx = dx / length * speed
         vy = dy / length * speed
 
-        projectile_manager.spawn(
+        projectile = projectile_manager.spawn(
             x=player_center_x,
             y=player_center_y,
             vx=vx,
             vy=vy,
-            radius=8,
+            radius=9,
             damage=damage,
             duration=duration,
-            color=(180, 180, 180),
+            color=(120, 120, 120),
             owner="player",
             bounce=False,
             pierce=False,
         )
+
+        projectile.effect_type = "mouse_bomb"
+        projectile.max_trail = 18
+        projectile.explosion_radius = 55 + level * 6
+        projectile.explosion_damage = damage
 
         return True
 

@@ -24,6 +24,15 @@ class LullabyAbility(BaseAbility):
 
         affected = 0
 
+        if hasattr(projectile_manager, "attack_indicator_system"):
+            projectile_manager.attack_indicator_system.show_circle(
+                player.x,
+                player.y,
+                range_pixels,
+                duration=18,
+                color=(120, 180, 255),
+            )
+
         for enemy in enemies:
             if enemy.hp <= 0:
                 continue
@@ -39,5 +48,13 @@ class LullabyAbility(BaseAbility):
             if distance_squared <= range_pixels * range_pixels:
                 enemy.freeze_timer = freeze_time
                 affected += 1
+
+                if hasattr(projectile_manager, "effect_manager"):
+                    projectile_manager.effect_manager.add_status_text(
+                        enemy.x,
+                        enemy.y,
+                        "SLEEP!",
+                        (120, 180, 255),
+                    )
 
         return affected > 0

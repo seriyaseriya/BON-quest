@@ -34,7 +34,47 @@ class PurrAbility(BaseAbility):
         heal_interval = max(20, 90 - level * 8)
 
         if player.purr_still_timer % heal_interval == 0:
+            old_hp = player.hp
+
+            old_hp = player.hp
+
             player.hp += 1
 
             if player.hp > player.max_hp:
                 player.hp = player.max_hp
+
+            healed = player.hp - old_hp
+
+            if healed > 0:
+                if hasattr(projectile_manager, "effect_manager"):
+                    projectile_manager.effect_manager.add_heal_effect(
+                        player.x,
+                        player.y,
+                        healed,
+                    )
+
+                if hasattr(projectile_manager, "particle_manager"):
+                    projectile_manager.particle_manager.spawn_burst(
+                        player.x,
+                        player.y,
+                        image_key="star",
+                        color=(120, 255, 160),
+                        count=10,
+                        power=1.2,
+                        gravity=-0.02,
+                        life_min=18,
+                        life_max=32,
+                        size_min=1,
+                        size_max=3,
+                        start_scale=0.45,
+                    )
+
+            healed = player.hp - old_hp    
+
+            if healed > 0:
+                    if hasattr(projectile_manager, "effect_manager"):
+                        projectile_manager.effect_manager.add_heal_effect(
+                            player.x,
+                            player.y,
+                            healed,
+                        )        

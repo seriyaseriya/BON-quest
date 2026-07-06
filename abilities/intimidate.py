@@ -25,6 +25,15 @@ class IntimidateAbility(BaseAbility):
 
         affected = 0
 
+        if hasattr(projectile_manager, "attack_indicator_system"):
+            projectile_manager.attack_indicator_system.show_circle(
+                player.x,
+                player.y,
+                range_pixels,
+                duration=14,
+                color=(255, 90, 70),
+            )
+
         for enemy in enemies:
             if enemy.hp <= 0:
                 continue
@@ -46,6 +55,13 @@ class IntimidateAbility(BaseAbility):
 
                 if enemy.hp > 0:
                     enemy.freeze_timer = stun_time
+                    if hasattr(projectile_manager, "effect_manager"):
+                        projectile_manager.effect_manager.add_status_text(
+                            enemy.x,
+                            enemy.y,
+                            "STUN!",
+                            (255, 120, 80),
+                        )
 
                 affected += 1
 

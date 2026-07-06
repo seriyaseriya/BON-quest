@@ -37,6 +37,7 @@ class Particle:
 
         self.scale = start_scale
         self.scale_speed = scale_speed
+        self.effect_type = "normal"
 
     def update(self):
         self.x += self.vx

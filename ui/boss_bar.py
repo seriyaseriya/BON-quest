@@ -12,10 +12,10 @@ def draw_boss_bar(screen, boss):
 
     font = get_menu_font()
 
-    bar_width = 420
-    bar_height = 22
-    bar_x = (WIDTH - bar_width) // 2
-    bar_y = 28
+    bar_width = 340
+    bar_height = 14
+    bar_x = 24
+    bar_y = HEIGHT - 75
 
     hp_ratio = boss.hp / boss.max_hp
     hp_ratio = max(0, min(1, hp_ratio))
@@ -23,7 +23,7 @@ def draw_boss_bar(screen, boss):
     name = getattr(boss, "name", "KING RAT")
 
     name_text = font.render(name, True, UI_TITLE)
-    screen.blit(name_text, (bar_x, bar_y - 26))
+    screen.blit(name_text, (bar_x, bar_y - 22))
 
     pygame.draw.rect(
         screen,
